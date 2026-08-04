@@ -85,11 +85,8 @@ export const DATA = {
             start: "2025.07",
             end: "2026.02",
             description: [
-                "전북대학교 차세대 통합정보시스템 구축 프로젝트 참여",
-                "기존 Nexacro 기반 화면을 자사 UI 솔루션인 eXBuilder6 기반으로 전환하는 마이그레이션 수행",
-                "기존 업무 쿼리와 데이터 구조를 분석하고, 차세대 시스템 요구사항을 반영한 Oracle·MyBatis 쿼리로 재구성",
-                "수기로 작성하던 직원채용 지원서와 제출 서류를 온라인에서 입력·저장·조회·제출할 수 있도록 화면과 업무 로직 구현",
-                "신규 화면 필드와 기존 DB 컬럼 간 매핑 오류, 조회 조건 누락으로 발생한 데이터 불일치 문제를 분석하고 SQL과 저장 로직을 수정",
+                "자사 UI 솔루션(eXBuilder6)을 활용한 업무 화면 개발과 Java 기반 서비스 로직 구현을 담당했습니다.",
+                "기존 시스템의 업무 기능을 차세대 시스템으로 마이그레이션하며 화면과 서버 기능을 개발했습니다.",
             ],
         },
     ],
@@ -121,12 +118,57 @@ export const DATA = {
     ],
     projects: [
         {
-            title: "PlanMate",
-            href: "https://github.com/f-lab-edu/plan-mate",
-            dates: "2026",
-            active: true,
+            category: "업무 프로젝트",
+            title: "전북대학교 차세대 통합정보시스템",
+            subtitle: "직원채용 및 학사 교류 업무 개발",
+            href: "",
+            dates: "2025.09 - 2026.02",
+            active: false,
+            organization: "토마토시스템",
             description:
-                "사용자의 여행 조건과 선호를 바탕으로 후보 장소를 수집하고, AI가 여행 일정을 생성하는 여행 계획 서비스입니다.",
+                "기존 대학 행정 시스템의 화면·서버·DB 구조를 분석하고 차세대 시스템으로 전환한 프로젝트입니다.\n" +
+                "\n" +
+                "**기술 구현**\n" +
+                "- Nexacro 화면을 eXBuilder6 구조로 전환\n" +
+                "- 화면 요청값과 서버 파라미터 매핑 구현\n" +
+                "- 직원채용·학사 교류 조회·저장 로직 구현\n" +
+                "- Oracle 업무 쿼리 분석 및 MyBatis Mapper로 재구성\n" +
+                "\n" +
+                "**문제 해결**\n" +
+                "\n" +
+                "개발 과정에서 발견한 ERD 관계, PK/FK 설정, 공통코드 구조의 설계 이슈를\n" +
+                "설계자와 협의하여 개선하고 데이터 정합성을 확보했습니다.",
+            technologies: [
+                "Java",
+                "Spring",
+                "Oracle",
+                "MyBatis",
+                "eXBuilder6",
+            ],
+            links: [],
+            image: "/jbnu.png",
+            video: "",
+        },
+        {
+            category: "개인 프로젝트",
+            title: "PlanMate",
+            subtitle: "AI 기반 여행 일정 생성 서비스",
+            href: "https://github.com/f-lab-edu/plan-mate",
+            dates: "2026 - 진행 중",
+            active: true,
+            organization: "개인 프로젝트",
+            description:
+                "사용자 조건을 기반으로 실제 장소 후보를 수집하고 검증 가능한 AI 일정을 생성하는 서비스입니다.\n" +
+                "\n" +
+                "**기술 구현**\n" +
+                "- Google Places 응답 정규화 및 후보 저장\n" +
+                "- 관심사·거리·유형 기반 필터링과 점수화\n" +
+                "- placeId 검증 후 일정 데이터 저장\n" +
+                "- Outbox·Debezium·RabbitMQ 기반 비동기 처리\n" +
+                "\n" +
+                "**설계 포인트**\n" +
+                "\n" +
+                "DB 저장과 메시지 발행의 정합성을 Outbox로 보완하고, Worker 상태를 Prometheus·Grafana로 추적했습니다.",
             technologies: [
                 "Java 21",
                 "Spring Boot",

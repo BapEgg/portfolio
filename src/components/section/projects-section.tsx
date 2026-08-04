@@ -31,7 +31,7 @@ export default function ProjectsSection() {
                         </h2>
 
                         <p className="text-muted-foreground md:text-lg/relaxed lg:text-base/relaxed xl:text-lg/relaxed text-balance text-center">
-                            실제 문제를 해결하기 위해 고민하고 구현한 프로젝트를 정리했습니다.
+                            실무와 개인 프로젝트에서 맡은 역할과 기술적 고민을 정리했습니다.
                         </p>
                     </div>
                 </div>
@@ -44,6 +44,7 @@ export default function ProjectsSection() {
                             className="h-full"
                         >
                             <ProjectCard
+                                category={project.category}
                                 href={project.href}
                                 title={project.title}
                                 description={project.description}
