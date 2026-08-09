@@ -131,7 +131,7 @@ export const DATA = {
                 "**기술 구현**\n" +
                 "- Nexacro 화면을 eXBuilder6 구조로 전환\n" +
                 "- 화면 요청값과 서버 파라미터 매핑 구현\n" +
-                "- 직원채용·학사 교류 조회·저장 로직 구현\n" +
+                "- 직원채용·학사 교류 CRUD 구현\n" +
                 "- Oracle 업무 쿼리 분석 및 MyBatis Mapper로 재구성\n" +
                 "\n" +
                 "**문제 해결**\n" +
@@ -153,7 +153,7 @@ export const DATA = {
             category: "개인 프로젝트",
             title: "PlanMate",
             subtitle: "AI 기반 여행 일정 생성 서비스",
-            href: "https://github.com/f-lab-edu/plan-mate",
+            href: "/projects/planmate",
             dates: "2026 - 진행 중",
             active: true,
             organization: "개인 프로젝트",
