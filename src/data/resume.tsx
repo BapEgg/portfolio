@@ -21,14 +21,16 @@ export const DATA = {
     url: "https://portfolio-bapegg.vercel.app",
     location: "대한민국, 서울",
     locationLink: "",
-    description:
-        "서버 백엔드 개발자",
+    description: "서버 백엔드 개발자",
+
     summary: [
         "복잡한 업무 요구사항을 이해하고, 이를 명확한 데이터 흐름과 백엔드 로직으로 정리하는 데 강점이 있습니다.",
         "실무에서는 기존 시스템을 분석하며 정확성과 안정성을 익혔고, 개인 프로젝트에서는 익숙하지 않은 비동기 처리와 메시징 구조를 직접 설계하며 기술 범위를 넓혀 왔습니다.",
         "모르는 기술을 단순히 적용하는 데 그치지 않고, 선택 이유와 한계를 끝까지 확인하고 기록하는 방식으로 개발합니다.",
     ],
+
     avatarUrl: "/me.png",
+
     skills: [
         {name: "Java", icon: Java},
         {name: "Spring Boot", icon: SpringBoot},
@@ -45,8 +47,13 @@ export const DATA = {
         {name: "React", icon: ReactLight},
         {name: "TypeScript", icon: Typescript},
     ],
+
     navbar: [
-        {href: "/", icon: HomeIcon, label: "Home"},
+        {
+            href: "/",
+            icon: HomeIcon,
+            label: "Home",
+        },
         {
             href: "https://velog.io/@bapegg/posts",
             icon: NotebookIcon,
@@ -57,6 +64,7 @@ export const DATA = {
     contact: {
         email: "lkhejj1@gmail.com",
         tel: "",
+
         social: {
             GitHub: {
                 name: "GitHub",
@@ -77,7 +85,7 @@ export const DATA = {
     work: [
         {
             company: "토마토시스템",
-            href: "https://www.tomatosystem.co.kr",
+            href: "https://tomatosystem.co.kr/kr/index.php",
             badges: [],
             location: "대한민국",
             title: "웹 개발자",
@@ -90,10 +98,11 @@ export const DATA = {
             ],
         },
     ],
+
     education: [
         {
             school: "F-Lab",
-            href: "",
+            href: "https://f-lab.kr/mentoring-courses/java-backend",
             degree: "백엔드 개발자 멘토링",
             logoUrl: "/flab.png",
             start: "2026.02",
@@ -101,7 +110,7 @@ export const DATA = {
         },
         {
             school: "KOSTA 한국소프트웨어기술진흥협회",
-            href: "",
+            href: "https://kostaswedu.co.kr/faq/?q=YToxOntzOjEyOiJrZXl3b3JkX3R5cGUiO3M6MzoiYWxsIjt9&bmode=view&idx=121204706&t=board",
             degree: "클라우드 네이티브 애플리케이션 개발(CNA) 전문가 양성과정",
             logoUrl: "/kosta.png",
             start: "2024.11",
@@ -109,13 +118,14 @@ export const DATA = {
         },
         {
             school: "고용노동부",
-            href: "",
+            href: "https://www.work24.go.kr/cm/c/f/1100/selecSystInfo.do?currentPageNo=1&recordCountPerPage=10&systClId=SC00000197&systId=SI00000423&upprSystClId=SC00000031",
             degree: "프로젝트 기반 빅데이터 분석 인재 양성과정",
             logoUrl: "/goyong.png",
             start: "2023.06",
             end: "2023.12",
         },
     ],
+
     projects: [
         {
             category: "업무 프로젝트",
@@ -125,6 +135,7 @@ export const DATA = {
             dates: "2025.09 - 2026.02",
             active: false,
             organization: "토마토시스템",
+
             description:
                 "기존 대학 행정 시스템의 화면·서버·DB 구조를 분석하고 차세대 시스템으로 전환한 프로젝트입니다.\n" +
                 "\n" +
@@ -138,6 +149,7 @@ export const DATA = {
                 "\n" +
                 "개발 과정에서 발견한 ERD 관계, PK/FK 설정, 공통코드 구조의 설계 이슈를\n" +
                 "설계자와 협의하여 개선하고 데이터 정합성을 확보했습니다.",
+
             technologies: [
                 "Java",
                 "Spring",
@@ -145,10 +157,12 @@ export const DATA = {
                 "MyBatis",
                 "eXBuilder6",
             ],
+
             links: [],
             image: "/jbnu.png",
             video: "",
         },
+
         {
             category: "개인 프로젝트",
             title: "PlanMate",
@@ -157,6 +171,7 @@ export const DATA = {
             dates: "2026 - 진행 중",
             active: true,
             organization: "개인 프로젝트",
+
             description:
                 "사용자 조건을 기반으로 실제 장소 후보를 수집하고 검증 가능한 AI 일정을 생성하는 서비스입니다.\n" +
                 "\n" +
@@ -169,6 +184,7 @@ export const DATA = {
                 "**설계 포인트**\n" +
                 "\n" +
                 "DB 저장과 메시지 발행의 정합성을 Outbox로 보완하고, Worker 상태를 Prometheus·Grafana로 추적했습니다.",
+
             technologies: [
                 "Java 21",
                 "Spring Boot",
@@ -184,6 +200,7 @@ export const DATA = {
                 "React",
                 "TypeScript",
             ],
+
             links: [
                 {
                     type: "GitHub",
@@ -196,8 +213,9 @@ export const DATA = {
                     icon: <Icons.globe className="size-3"/>,
                 },
             ],
+
             image: "/planmate.png",
             video: "",
         },
-    ]
+    ],
 } as const;

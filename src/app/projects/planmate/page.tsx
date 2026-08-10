@@ -1,21 +1,25 @@
 "use client";
 
-import {Badge} from "@/components/ui/badge";
+import Image from "next/image";
+import Link from "next/link";
+import type {ComponentType, ReactNode,} from "react";
+
+import {Accordion, AccordionContent, AccordionItem, AccordionTrigger,} from "@/components/ui/accordion";
+
 import {
     Activity,
     ArrowRight,
     ArrowUpRight,
-    Bot,
+    ChevronDown,
+    CircleDot,
     Database,
+    ExternalLink,
+    FlaskConical,
+    Github,
     KeyRound,
-    LayoutDashboard,
-    MessageSquareMore,
     Radio,
-    RefreshCcw,
-    ShieldCheck,
+    TriangleAlert,
 } from "lucide-react";
-import Link from "next/link";
-import {type ReactNode, useRef, useState,} from "react";
 
 import {Java} from "@/components/ui/svgs/java";
 import {SpringBoot} from "@/components/ui/svgs/springBoot";
@@ -32,116 +36,69 @@ import {ReactLight} from "@/components/ui/svgs/reactLight";
 import {Typescript} from "@/components/ui/svgs/typescript";
 
 /* -------------------------------------------------------------------------- */
+/* Config                                                                     */
+/* -------------------------------------------------------------------------- */
+
+const PROJECT_DEPLOY_URL: string | null = null;
+
+/*
+ * 배포 후:
+ *
+ * const PROJECT_DEPLOY_URL =
+ *     "https://planmate.example.com";
+ */
+
+/* -------------------------------------------------------------------------- */
 /* Types                                                                      */
 /* -------------------------------------------------------------------------- */
 
-type SectionId =
-    | "overview"
-    | "generation"
-    | "async"
-    | "outbox"
-    | "validation"
-    | "snapshot"
-    | "auth"
-    | "realtime"
-    | "monitoring";
+type StatusType =
+    | "implemented"
+    | "partial"
+    | "planned";
 
-/*
- * 기능별 색상이 아니라
- * 문제 해결 과정의 의미에 따라 색상을 사용한다.
- *
- * problem  : 문제 / Before / 장애
- * analysis : 분석 / 비교 / 설계 과정
- * decision : 선택 / 적용 / 결과
- * tradeoff : 비용 / 한계 / 현실적인 판단
- */
-type AccentTone =
-    | "problem"
-    | "analysis"
-    | "decision"
-    | "tradeoff"
-    | "neutral";
+type StarType =
+    | "situation"
+    | "task"
+    | "action"
+    | "result";
 
-interface NavigationItem {
-    id: SectionId;
-    number?: string;
-    title: string;
-    icon: ReactNode;
-}
-
-interface NavigationGroup {
-    label?: string;
-    items: readonly NavigationItem[];
-}
-
-interface CoreDecision {
-    id: SectionId;
+interface CoreFeature {
     number: string;
-    category: string;
     title: string;
-    description: string;
+    summary: string;
     technologies: readonly string[];
-    icon: ReactNode;
+    status: StatusType;
+
+    situation: ReactNode;
+    task: ReactNode;
+    action: ReactNode;
+    result: ReactNode;
+}
+
+interface TroubleshootingItem {
+    number: string;
+    title: string;
+    summary: string;
+    technologies: readonly string[];
+    status: StatusType;
+    content: ReactNode;
+}
+
+interface FailureExperiment {
+    number: string;
+    title: string;
+    summary: string;
+    technologies: readonly string[];
+
+    simulation: ReactNode;
+    problem: ReactNode;
+    action: ReactNode;
+    criteria: ReactNode;
 }
 
 /* -------------------------------------------------------------------------- */
-/* Semantic Color System                                                      */
-/* -------------------------------------------------------------------------- */
-
-/*
- * 영상에서 본 Latency / Traffic / Errors / Saturation처럼
- * 채도가 너무 높지 않은 Blue / Red / Amber / Green 계열을 사용한다.
- *
- * 단, 밝은 포트폴리오 배경에 맞게 Soft Background를 별도로 둔다.
- */
-const toneStyles = {
-    /* Traffic 계열 - 문제 / 장애 */
-    problem: {
-        text: "text-[#B84F57] dark:text-[#E4939A]",
-        bg: "bg-[#FBF1F2] dark:bg-[#2C1E20]",
-        border: "border-[#E7C5C8] dark:border-[#633D42]",
-        rail: "bg-[#DDA9AE] dark:bg-[#70464B]",
-        badge: "bg-[#B84F57] text-white",
-    },
-
-    /* Latency 계열 - 분석 / 비교 */
-    analysis: {
-        text: "text-[#496AA8] dark:text-[#91A9D7]",
-        bg: "bg-[#F1F4FA] dark:bg-[#1B2230]",
-        border: "border-[#C6D0E4] dark:border-[#3E4C69]",
-        rail: "bg-[#AABADA] dark:bg-[#485A7B]",
-        badge: "bg-[#496AA8] text-white",
-    },
-
-    /* Saturation 계열 - 선택 / 적용 / 결과 */
-    decision: {
-        text: "text-[#41765A] dark:text-[#83B497]",
-        bg: "bg-[#F0F6F2] dark:bg-[#19251E]",
-        border: "border-[#C2D8CA] dark:border-[#3C5C49]",
-        rail: "bg-[#9FBEAA] dark:bg-[#456853]",
-        badge: "bg-[#41765A] text-white",
-    },
-
-    /* Errors 계열 - Trade-off / 현실 판단 */
-    tradeoff: {
-        text: "text-[#A48432] dark:text-[#D9BC72]",
-        bg: "bg-[#FAF6EA] dark:bg-[#292419]",
-        border: "border-[#DED0A6] dark:border-[#5F5636]",
-        rail: "bg-[#CCB873] dark:bg-[#6A5D38]",
-        badge: "bg-[#A48432] text-white",
-    },
-
-    neutral: {
-        text: "text-muted-foreground",
-        bg: "bg-muted/20",
-        border: "border-border",
-        rail: "bg-border",
-        badge: "bg-foreground text-background",
-    },
-} as const;
-
-/* -------------------------------------------------------------------------- */
-/* Project Data                                                               */
+/* Technology                                                                 */
 /* -------------------------------------------------------------------------- */
 
 const technologies = [
@@ -170,12 +127,6 @@ const technologies = [
         icon: Redis,
     },
     {
-        name: "React",
-        icon: ReactLight,
-    },
-
-    // +6
-    {
         name: "Spring Security",
         icon: SpringSecurity,
     },
@@ -196,167 +147,1113 @@ const technologies = [
         icon: Grafana,
     },
     {
+        name: "React",
+        icon: ReactLight,
+    },
+    {
         name: "TypeScript",
         icon: Typescript,
     },
 ] as const;
 
-const navigationGroups: readonly NavigationGroup[] = [
-    {
-        items: [
-            {
-                id: "overview",
-                title: "개요",
-                icon: <LayoutDashboard className="size-4"/>,
-            },
-        ],
-    },
+/* -------------------------------------------------------------------------- */
+/* Core Features                                                              */
+/* -------------------------------------------------------------------------- */
 
+const coreFeatures: readonly CoreFeature[] = [
     {
-        label: "핵심 흐름",
-        items: [
-            {
-                id: "generation",
-                number: "01",
-                title: "일정 생성",
-                icon: <Bot className="size-4"/>,
-            },
-        ],
-    },
-
-    {
-        label: "핵심 의사결정",
-        items: [
-            {
-                id: "async",
-                number: "02",
-                title: "비동기 처리",
-                icon: <MessageSquareMore className="size-4"/>,
-            },
-            {
-                id: "outbox",
-                number: "03",
-                title: "Outbox & CDC",
-                icon: <RefreshCcw className="size-4"/>,
-            },
-            {
-                id: "validation",
-                number: "04",
-                title: "AI 검증",
-                icon: <ShieldCheck className="size-4"/>,
-            },
-            {
-                id: "snapshot",
-                number: "05",
-                title: "Snapshot",
-                icon: <Database className="size-4"/>,
-            },
-        ],
-    },
-
-    {
-        label: "지원 설계",
-        items: [
-            {
-                id: "auth",
-                number: "06",
-                title: "인증",
-                icon: <KeyRound className="size-4"/>,
-            },
-            {
-                id: "realtime",
-                number: "07",
-                title: "실시간 상태",
-                icon: <Radio className="size-4"/>,
-            },
-            {
-                id: "monitoring",
-                number: "08",
-                title: "모니터링",
-                icon: <Activity className="size-4"/>,
-            },
-        ],
-    },
-];
-
-const coreDecisions: readonly CoreDecision[] = [
-    {
-        id: "generation",
         number: "01",
-        category: "일정 생성",
-        title:
-            "실제 장소 후보를 기반으로 AI 일정을 생성하도록 구성했습니다.",
-        description:
-            "Google Places에서 실제 장소 후보를 먼저 수집하고, AI는 해당 후보 안에서 일정을 구성하도록 제한했습니다.",
-        technologies: [
-            "Google Places",
-            "Snapshot",
-            "AI",
-        ],
-        icon: <Bot className="size-5"/>,
-    },
 
-    {
-        id: "async",
-        number: "02",
-        category: "비동기 처리",
         title:
-            "HTTP 요청과 일정 생성 작업을 분리했습니다.",
-        description:
-            "요청은 generationId 반환까지만 담당하고, 외부 API를 포함한 긴 후보 수집 작업은 RabbitMQ Worker가 처리합니다.",
+            "긴 일정 생성 작업을 HTTP 요청에서 분리",
+
+        summary:
+            "generationId를 먼저 반환하고 외부 API 호출과 후보 수집은 Worker가 처리하도록 변경했습니다.",
+
         technologies: [
             "RabbitMQ",
             "Worker",
-            "ACK",
+            "Generation Status",
         ],
-        icon: <MessageSquareMore className="size-5"/>,
+
+        status: "implemented",
+
+        situation: (
+            <>
+                <Paragraph>
+                    일정 생성에는 Google Places를 통한 장소 후보 수집처럼
+                    응답 시간을 애플리케이션이 직접 통제하기 어려운
+                    외부 API 호출이 포함됩니다.
+                </Paragraph>
+
+                <Paragraph>
+                    이 작업을 하나의 HTTP 요청 안에서 모두 처리하면
+                    외부 시스템의 지연과 장애가
+                    사용자 요청의 응답 시간에 그대로 영향을 줍니다.
+                </Paragraph>
+
+                <SimpleFlow
+                    items={[
+                        "HTTP 요청",
+                        "후보 수집",
+                        "Google Places",
+                        "후보 저장",
+                        "HTTP 응답",
+                    ]}
+                    danger
+                />
+            </>
+        ),
+
+        task: (
+            <BulletList
+                items={[
+                    "HTTP 요청과 오래 걸리는 작업의 생명주기 분리",
+                    "요청 종료 이후에도 후보 수집 작업 지속",
+                    "현재 작업 진행 상태를 Generation 단위로 추적",
+                    "Retry · Redelivery를 적용할 수 있는 실행 구조 확보",
+                ]}
+            />
+        ),
+
+        action: (
+            <>
+                <Paragraph>
+                    HTTP 요청은 Generation을 생성하고
+                    <Strong>
+                        {" "}generationId를 반환하는 것까지
+                    </Strong>
+                    담당하도록 책임을 줄였습니다.
+                </Paragraph>
+
+                <Paragraph>
+                    실제 후보 수집은 HTTP 요청에서 분리하고
+                    RabbitMQ 메시지를 소비하는 Worker가
+                    실행하도록 변경했습니다.
+                </Paragraph>
+
+                <SimpleFlow
+                    items={[
+                        "HTTP Request",
+                        "Generation",
+                        "generationId 반환",
+                        "RabbitMQ",
+                        "Worker",
+                        "후보 수집",
+                    ]}
+                />
+            </>
+        ),
+
+        result: (
+            <>
+                <div className="flex flex-wrap gap-2">
+                    <ResultMetric>
+                        HTTP 책임
+                        <strong className="ml-1">
+                            작업 완료 → 작업 접수
+                        </strong>
+                    </ResultMetric>
+
+                    <ResultMetric>
+                        외부 API
+                        <strong className="ml-1">
+                            HTTP 생명주기와 분리
+                        </strong>
+                    </ResultMetric>
+
+                    <ResultMetric>
+                        상태 추적
+                        <strong className="ml-1">
+                            Generation 기반
+                        </strong>
+                    </ResultMetric>
+                </div>
+
+                <LearningNote>
+                    비동기 전환의 결과를 단순히
+                    전체 처리 속도 개선으로 표현하지 않고,
+                    사용자 HTTP 요청과 실제 작업 실행의
+                    책임을 분리한 것으로 정리했습니다.
+                    이후 동일 조건에서 접수 API의
+                    p50 · p95도 측정할 예정입니다.
+                </LearningNote>
+            </>
+        ),
     },
 
     {
-        id: "outbox",
-        number: "03",
-        category: "메시지 정합성",
+        number: "02",
+
         title:
-            "DB 저장과 메시지 발행의 정합성을 Outbox와 CDC로 보완했습니다.",
-        description:
-            "Business Data와 Outbox Event를 같은 Transaction으로 저장하고, Debezium이 PostgreSQL WAL 변경을 읽어 RabbitMQ로 전달합니다.",
+            "DB 저장과 메시지 전달 사이의 작업 유실 방지",
+
+        summary:
+            "Transactional Outbox와 Debezium CDC를 적용해 DB와 RabbitMQ 사이의 Dual Write 경계를 분리했습니다.",
+
         technologies: [
             "Outbox",
             "Debezium",
             "WAL",
+            "RabbitMQ",
         ],
-        icon: <RefreshCcw className="size-5"/>,
+
+        status: "implemented",
+
+        situation: (
+            <>
+                <Paragraph>
+                    Generation을 PostgreSQL에 저장한 뒤
+                    RabbitMQ로 메시지를 직접 발행하면
+                    두 작업은 서로 다른 시스템에서 실행됩니다.
+                </Paragraph>
+
+                <DualWriteDiagram/>
+
+                <Paragraph>
+                    DB Commit은 성공했지만
+                    RabbitMQ Publish가 실패하면
+                    DB에는 작업이 존재하는데
+                    Worker는 작업의 존재를 모르는 상태가 만들어집니다.
+                </Paragraph>
+            </>
+        ),
+
+        task: (
+            <BulletList
+                items={[
+                    "Generation 저장과 작업 전달 의도를 함께 보존",
+                    "DB Transaction과 Message Publish 실패 경계 분리",
+                    "Application과 RabbitMQ 직접 결합 제거",
+                    "CDC 중단 이후에도 이어서 처리 가능한 구조 확보",
+                ]}
+            />
+        ),
+
+        action: (
+            <>
+                <Paragraph>
+                    Generation,
+                    InputSnapshot,
+                    Outbox Event를
+                    <Strong>
+                        {" "}하나의 PostgreSQL Transaction
+                    </Strong>
+                    에서 함께 저장했습니다.
+                </Paragraph>
+
+                <SimpleFlow
+                    items={[
+                        "Generation",
+                        "Outbox",
+                        "COMMIT",
+                        "WAL",
+                        "Debezium",
+                        "RabbitMQ",
+                    ]}
+                />
+
+                <Paragraph>
+                    Debezium이 PostgreSQL WAL의 Outbox 변경을 읽어
+                    RabbitMQ로 전달하도록 구성했습니다.
+                </Paragraph>
+            </>
+        ),
+
+        result: (
+            <>
+                <div className="flex flex-wrap gap-2">
+                    <ResultMetric>
+                        DB
+                        <strong className="ml-1">
+                            Business + Outbox 원자적 저장
+                        </strong>
+                    </ResultMetric>
+
+                    <ResultMetric>
+                        MQ
+                        <strong className="ml-1">
+                            Application 직접 발행 제거
+                        </strong>
+                    </ResultMetric>
+
+                    <ResultMetric>
+                        장애 경계
+                        <strong className="ml-1">
+                            CDC 복구 문제로 분리
+                        </strong>
+                    </ResultMetric>
+                </div>
+
+                <LearningNote>
+                    Outbox를 적용한다고 장애 자체가 없어지는 것은 아니었습니다.
+                    대신 DB와 MQ 사이의 Dual Write 문제를
+                    재시작 가능한 CDC 전달 문제로 변경했습니다.
+                </LearningNote>
+            </>
+        ),
     },
 
     {
-        id: "validation",
-        number: "04",
-        category: "AI 검증",
+        number: "03",
+
         title:
-            "AI 생성 결과를 서버에서 검증한 뒤 저장합니다.",
-        description:
-            "AI 응답을 그대로 신뢰하지 않고 Candidate, 일정 구조, 시간 조건과 Domain Rule을 기준으로 다시 검증합니다.",
+            "최소 한 번 전달에서도 다시 실행 가능한 Worker 설계",
+
+        summary:
+            "ACK 실패와 Redelivery를 전제로 중복 전달 자체보다 재실행에 안전한 Consumer를 설계했습니다.",
+
+        technologies: [
+            "ACK",
+            "Redelivery",
+            "Idempotency",
+            "DLQ",
+        ],
+
+        status: "partial",
+
+        situation: (
+            <>
+                <Paragraph>
+                    RabbitMQ Worker가 후보 데이터 저장까지 완료하더라도
+                    ACK를 전송하기 전에 종료되면
+                    RabbitMQ는 처리 완료 사실을 알 수 없습니다.
+                </Paragraph>
+
+                <SimpleFlow
+                    items={[
+                        "Message",
+                        "Worker",
+                        "DB Commit",
+                        "Worker 종료",
+                        "ACK 실패",
+                        "Redelivery",
+                    ]}
+                    danger
+                />
+
+                <Paragraph>
+                    따라서 한 번 처리한 메시지가
+                    다시 Consumer에게 전달될 수 있습니다.
+                </Paragraph>
+            </>
+        ),
+
+        task: (
+            <BulletList
+                items={[
+                    "같은 메시지가 다시 전달돼도 데이터 중복 방지",
+                    "작업 중 Worker가 종료돼도 다시 실행 가능",
+                    "허용되지 않은 Generation 상태 전이 차단",
+                    "반복 실패 Message를 정상 Queue에서 격리",
+                ]}
+            />
+        ),
+
+        action: (
+            <>
+                <BulletList
+                    items={[
+                        "generationId 기준 기존 Generation 상태 확인",
+                        "허용된 상태 전이만 수행하는 State Guard",
+                        "DB Constraint를 통한 중복 데이터 최종 방어",
+                        "Retry 및 DLQ 구조 적용",
+                        "At-least-once 전달을 전제로 Consumer 설계",
+                    ]}
+                />
+
+                <SimpleFlow
+                    items={[
+                        "Redelivery",
+                        "상태 확인",
+                        "이미 처리?",
+                        "멱등 처리",
+                        "정상 종료",
+                    ]}
+                />
+            </>
+        ),
+
+        result: (
+            <>
+                <div className="flex flex-wrap gap-2">
+                    <ResultMetric>
+                        전달 모델
+                        <strong className="ml-1">
+                            At-least-once 전제
+                        </strong>
+                    </ResultMetric>
+
+                    <ResultMetric>
+                        Consumer
+                        <strong className="ml-1">
+                            재실행 가능 구조
+                        </strong>
+                    </ResultMetric>
+
+                    <ResultMetric>
+                        반복 실패
+                        <strong className="ml-1">
+                            DLQ 격리
+                        </strong>
+                    </ResultMetric>
+                </div>
+
+                <PendingNotice>
+                    현재 상태 Guard와 DLQ 인프라는 구성했지만
+                    ACK 이전 Worker 종료를 실제로 주입하는
+                    Redelivery 테스트는 진행 전입니다.
+                    실험 후 중복 Candidate 수와 정상 완료율을
+                    실제 수치로 추가합니다.
+                </PendingNotice>
+            </>
+        ),
+    },
+
+    {
+        number: "04",
+
+        title:
+            "형식은 맞지만 실행할 수 없는 AI 일정 차단",
+
+        summary:
+            "AI 응답을 JSON 형식만 검증하지 않고 실제 장소 후보와 시간 조건까지 서버에서 다시 검증합니다.",
+
         technologies: [
             "Validation",
-            "Whitelist",
-            "Idempotency",
+            "Candidate",
+            "Overlap",
+            "Daily Window",
         ],
-        icon: <ShieldCheck className="size-5"/>,
+
+        status: "implemented",
+
+        situation: (
+            <>
+                <Paragraph>
+                    AI가 JSON Schema와 DTO 형식을 정상적으로 만족해도
+                    실제 여행 일정으로는 사용할 수 없는 결과가
+                    만들어질 수 있습니다.
+                </Paragraph>
+
+                <ScheduleExample/>
+
+                <Paragraph>
+                    각 일정의 시간 값과 JSON 구조는 모두 정상입니다.
+                    하지만 같은 시간대가 겹치기 때문에
+                    실제 여행 일정으로 사용할 수 없습니다.
+                </Paragraph>
+            </>
+        ),
+
+        task: (
+            <BulletList
+                items={[
+                    "서버가 제공하지 않은 장소 사용 차단",
+                    "같은 날짜의 일정 시간 중복 검출",
+                    "하루 경계를 넘어가는 일정 차단",
+                    "사용자가 지정한 활동 가능 시간 검증",
+                    "필수 방문 장소 누락 검증",
+                ]}
+            />
+        ),
+
+        action: (
+            <>
+                <Paragraph>
+                    AI 응답 검증을
+                    DTO 구조 검증과
+                    실제 도메인 의미 검증으로 분리했습니다.
+                </Paragraph>
+
+                <SimpleFlow
+                    items={[
+                        "AI Draft",
+                        "Structure",
+                        "Candidate",
+                        "Time",
+                        "ValidationReport",
+                    ]}
+                />
+
+                <CodePanel>
+                    {`시간 구간
+
+[startMinute, endMinute)
+
+Overlap
+
+A.start < B.end
+AND
+B.start < A.end`}
+                </CodePanel>
+            </>
+        ),
+
+        result: (
+            <>
+                <div className="flex flex-wrap gap-2">
+                    <ResultMetric>
+                        Semantic Error
+                        <strong className="ml-1">
+                            422
+                        </strong>
+                    </ResultMetric>
+
+                    <ResultMetric>
+                        DB Write
+                        <strong className="ml-1">
+                            없음
+                        </strong>
+                    </ResultMetric>
+
+                    <ResultMetric>
+                        Generation
+                        <strong className="ml-1">
+                            READY 유지
+                        </strong>
+                    </ResultMetric>
+                </div>
+
+                <LearningNote>
+                    AI 응답을 파싱 가능한 JSON인지가 아니라
+                    실제 도메인 데이터로 저장 가능한지
+                    서버가 최종 판단하도록 책임을 분리했습니다.
+                </LearningNote>
+            </>
+        ),
+    },
+];
+
+/* -------------------------------------------------------------------------- */
+/* Troubleshooting                                                            */
+/* -------------------------------------------------------------------------- */
+
+const troubleshootingItems: readonly TroubleshootingItem[] = [
+    {
+        number: "01",
+
+        title:
+            "AI가 시간상 실행 불가능한 일정을 반환",
+
+        summary:
+            "JSON 형식 검증만으로 발견되지 않는 일정 시간 충돌을 서버에서 차단했습니다.",
+
+        technologies: [
+            "Validation",
+            "Overlap",
+            "HTTP 422",
+        ],
+
+        status: "implemented",
+
+        content: (
+            <>
+                <TroubleSection
+                    type="situation"
+                    english="BEFORE"
+                    title="문제"
+                >
+                    <ScheduleExample/>
+
+                    <Paragraph>
+                        JSON 구조와 각각의 시간 값은 정상이라
+                        DTO 검증에서는 오류로 판단되지 않았습니다.
+                    </Paragraph>
+                </TroubleSection>
+
+                <TroubleSection
+                    type="action"
+                    english="ACTION"
+                    title="해결"
+                >
+                    <BulletList
+                        items={[
+                            "HH:mm 값을 minute-of-day로 변환",
+                            "같은 날짜의 모든 일정 Pair 비교",
+                            "[start, end) Interval 적용",
+                            "Overlap 발견 시 ValidationIssue 생성",
+                            "Semantic Error 존재 시 HTTP 422 반환",
+                        ]}
+                    />
+                </TroubleSection>
+
+                <TroubleSection
+                    type="result"
+                    english="RESULT"
+                    title="결과"
+                >
+                    <div className="flex flex-wrap gap-2">
+                        <ResultMetric>
+                            잘못된 일정
+                            <strong className="ml-1">
+                                저장 차단
+                            </strong>
+                        </ResultMetric>
+
+                        <ResultMetric>
+                            Generation
+                            <strong className="ml-1">
+                                READY 유지
+                            </strong>
+                        </ResultMetric>
+
+                        <ResultMetric>
+                            결과 수정
+                            <strong className="ml-1">
+                                재제출 가능
+                            </strong>
+                        </ResultMetric>
+                    </div>
+
+                    <LearningNote>
+                        AI 검증 실패를 Generation 전체 실패로 처리하지 않고
+                        AI 결과만 수정해 다시 제출할 수 있도록
+                        실패 경계를 분리했습니다.
+                    </LearningNote>
+                </TroubleSection>
+            </>
+        ),
     },
 
     {
-        id: "snapshot",
-        number: "05",
-        category: "생성 데이터 보존",
+        number: "02",
+
         title:
-            "일정 생성 시점의 입력과 후보 데이터를 Snapshot으로 보존합니다.",
-        description:
-            "이후 Trip 수정이나 외부 Place 데이터 변경이 과거 Generation의 의미를 바꾸지 않도록 생성 당시 데이터를 저장합니다.",
+            "네트워크 Retry로 동일 AI 결과가 여러 번 제출",
+
+        summary:
+            "동일 결과 재제출은 안전하게 허용하고 서로 다른 결과는 충돌로 처리했습니다.",
+
         technologies: [
-            "InputSnapshot",
-            "CandidateSnapshot",
+            "Idempotency",
+            "Pessimistic Lock",
+            "Unique",
         ],
-        icon: <Database className="size-5"/>,
+
+        status: "implemented",
+
+        content: (
+            <>
+                <TroubleSection
+                    type="situation"
+                    english="PROBLEM"
+                    title="문제"
+                >
+                    <Paragraph>
+                        서버가 일정 저장을 완료했지만
+                        클라이언트가 네트워크 문제로 응답을 받지 못하면
+                        같은 요청을 다시 제출할 수 있습니다.
+                    </Paragraph>
+
+                    <SimpleFlow
+                        items={[
+                            "Submit",
+                            "DB 저장",
+                            "응답 유실",
+                            "Client Retry",
+                            "중복 저장?",
+                        ]}
+                        danger
+                    />
+                </TroubleSection>
+
+                <TroubleSection
+                    type="action"
+                    english="ACTION"
+                    title="해결"
+                >
+                    <BulletList
+                        items={[
+                            "Generation Pessimistic Lock",
+                            "Generation당 Itinerary UNIQUE Constraint",
+                            "기존 결과와 canonical 비교",
+                            "동일 Replay는 추가 Write 없이 반환",
+                            "서로 다른 결과는 409 Conflict",
+                        ]}
+                    />
+                </TroubleSection>
+
+                <TroubleSection
+                    type="result"
+                    english="RESULT"
+                    title="결과"
+                >
+                    <div
+                        className="
+                            grid max-w-[620px]
+                            gap-3
+                            sm:grid-cols-2
+                        "
+                    >
+                        <OutcomeBox
+                            title="동일 결과 재제출"
+                            value="200 · 추가 DB Write 없음"
+                            success
+                        />
+
+                        <OutcomeBox
+                            title="다른 결과 재제출"
+                            value="409 Conflict"
+                        />
+                    </div>
+                </TroubleSection>
+            </>
+        ),
+    },
+
+    {
+        number: "03",
+
+        title:
+            "반복 실패 메시지가 정상 Queue를 계속 점유",
+
+        summary:
+            "재시도로 복구 가능한 실패와 격리해야 할 실패를 구분했습니다.",
+
+        technologies: [
+            "Retry",
+            "DLX",
+            "DLQ",
+        ],
+
+        status: "partial",
+
+        content: (
+            <>
+                <TroubleSection
+                    type="situation"
+                    english="PROBLEM"
+                    title="문제"
+                >
+                    <Paragraph>
+                        처리할 수 없는 메시지를 제한 없이 다시 처리하면
+                        Worker 자원과 정상 메시지 처리 기회를
+                        지속적으로 소비하게 됩니다.
+                    </Paragraph>
+
+                    <SimpleFlow
+                        items={[
+                            "Message",
+                            "실패",
+                            "Retry",
+                            "실패",
+                            "Retry",
+                            "...",
+                        ]}
+                        danger
+                    />
+                </TroubleSection>
+
+                <TroubleSection
+                    type="action"
+                    english="ACTION"
+                    title="대응"
+                >
+                    <SimpleFlow
+                        items={[
+                            "Worker 실패",
+                            "Retry",
+                            "Retry 한도",
+                            "DLX",
+                            "DLQ",
+                        ]}
+                    />
+
+                    <BulletList
+                        items={[
+                            "Retry 가능한 실패와 최종 실패 분리",
+                            "Dead Letter Exchange / Queue 구성",
+                            "실패 메시지를 정상 Queue에서 격리",
+                        ]}
+                    />
+                </TroubleSection>
+
+                <TroubleSection
+                    type="result"
+                    english="RESULT"
+                    title="현재 상태"
+                >
+                    <PendingNotice>
+                        DLX / DLQ 인프라 구성은 완료했습니다.
+                        Retry 횟수와 DLQ 운영·재처리 기준은
+                        장애 주입 테스트 결과를 기반으로 최종화할 예정입니다.
+                    </PendingNotice>
+                </TroubleSection>
+            </>
+        ),
+    },
+
+    {
+        number: "04",
+
+        title:
+            "ACK 이전 Worker 장애에서 동일 Message 재전달",
+
+        summary:
+            "At-least-once 환경에서 같은 작업이 다시 실행돼도 데이터 정합성이 유지되는지 검증합니다.",
+
+        technologies: [
+            "ACK",
+            "Redelivery",
+            "Idempotency",
+        ],
+
+        status: "partial",
+
+        content: (
+            <>
+                <TroubleSection
+                    type="situation"
+                    english="PROBLEM"
+                    title="문제"
+                >
+                    <Paragraph>
+                        Worker가 DB 처리를 완료한 직후
+                        ACK를 보내기 전에 종료되면
+                        RabbitMQ는 Message를 다시 전달할 수 있습니다.
+                    </Paragraph>
+
+                    <SimpleFlow
+                        items={[
+                            "Message",
+                            "Worker",
+                            "DB Commit",
+                            "Worker 종료",
+                            "ACK 실패",
+                            "Redelivery",
+                        ]}
+                        danger
+                    />
+                </TroubleSection>
+
+                <TroubleSection
+                    type="action"
+                    english="ACTION"
+                    title="대응"
+                >
+                    <BulletList
+                        items={[
+                            "Generation 상태 기반 처리 판단",
+                            "State Guard 적용",
+                            "DB Constraint로 중복 저장 방어",
+                            "At-least-once 환경을 전제로 Consumer 설계",
+                        ]}
+                    />
+                </TroubleSection>
+
+                <TroubleSection
+                    type="result"
+                    english="RESULT"
+                    title="검증 예정"
+                >
+                    <PendingNotice>
+                        실제 ACK 이전 Worker 강제 종료 실험 후
+                        Redelivery 횟수,
+                        중복 Candidate 수,
+                        최종 READY 전환 여부를 기록합니다.
+                    </PendingNotice>
+                </TroubleSection>
+            </>
+        ),
+    },
+];
+
+/* -------------------------------------------------------------------------- */
+/* Failure Experiments                                                        */
+/* -------------------------------------------------------------------------- */
+
+const failureExperiments: readonly FailureExperiment[] = [
+    {
+        number: "01",
+
+        title:
+            "Debezium 중단 후 재시작",
+
+        summary:
+            "CDC 중단 동안 생성된 Outbox Event가 재기동 후 누락 없이 전달되는지 확인합니다.",
+
+        technologies: [
+            "Debezium",
+            "WAL",
+            "Offset",
+        ],
+
+        simulation: (
+            <BulletList
+                items={[
+                    "정상 상태에서 Generation + Outbox 생성",
+                    "Outbox Commit 이후 Debezium Container 종료",
+                    "중단 상태에서 Generation 추가 생성",
+                    "Debezium 재기동",
+                ]}
+            />
+        ),
+
+        problem: (
+            <>
+                <Paragraph>
+                    Debezium이 중단된 동안
+                    RabbitMQ에는 Event가 전달되지 않습니다.
+                </Paragraph>
+
+                <Paragraph>
+                    재기동 시 중단 기간의 Event가
+                    유실되지 않고 이어서 처리되는지 확인해야 합니다.
+                </Paragraph>
+            </>
+        ),
+
+        action: (
+            <BulletList
+                items={[
+                    "Outbox Event DB 영속화",
+                    "PostgreSQL WAL 기반 CDC",
+                    "Debezium Offset 기반 처리 위치 관리",
+                    "Application Transaction과 CDC 장애 분리",
+                ]}
+            />
+        ),
+
+        criteria: (
+            <MetricList
+                items={[
+                    "중단 중 Outbox 수",
+                    "재기동 후 전달 수",
+                    "Event 유실 건수",
+                    "READY 전환 완료 수",
+                    "복구 시간",
+                ]}
+            />
+        ),
+    },
+
+    {
+        number: "02",
+
+        title:
+            "ACK 이전 Worker 강제 종료",
+
+        summary:
+            "Redelivery가 발생해도 같은 Generation의 후보가 중복 저장되지 않는지 확인합니다.",
+
+        technologies: [
+            "ACK",
+            "Redelivery",
+            "Idempotency",
+        ],
+
+        simulation: (
+            <BulletList
+                items={[
+                    "Worker Message Consume",
+                    "후보 데이터 DB 반영",
+                    "ACK 전송 직전 Worker 종료",
+                    "Worker 재기동",
+                ]}
+            />
+        ),
+
+        problem: (
+            <Paragraph>
+                DB 반영은 완료됐지만
+                RabbitMQ가 ACK를 받지 못해
+                동일 Message를 다시 전달할 수 있습니다.
+            </Paragraph>
+        ),
+
+        action: (
+            <BulletList
+                items={[
+                    "Generation State Guard",
+                    "generationId 기준 처리 상태 확인",
+                    "DB Constraint",
+                    "멱등 Consumer",
+                ]}
+            />
+        ),
+
+        criteria: (
+            <MetricList
+                items={[
+                    "Redelivery 횟수",
+                    "중복 Candidate 수",
+                    "READY 완료 수",
+                    "Retry 횟수",
+                    "복구 실패 수",
+                ]}
+            />
+        ),
+    },
+
+    {
+        number: "03",
+
+        title:
+            "Debezium Offset 유실",
+
+        summary:
+            "이미 처리한 Outbox Event가 다시 전달되는 상황에서도 데이터 정합성이 유지되는지 확인합니다.",
+
+        technologies: [
+            "Offset",
+            "Replay",
+            "Idempotency",
+        ],
+
+        simulation: (
+            <BulletList
+                items={[
+                    "Outbox Event 정상 처리",
+                    "Debezium Offset 상태 초기화",
+                    "Connector 재기동",
+                    "과거 Event 재전달 확인",
+                ]}
+            />
+        ),
+
+        problem: (
+            <Paragraph>
+                Offset 정보가 유실되면
+                이미 처리한 Event를 다시 읽을 수 있으므로
+                Downstream Consumer가 재실행에 안전해야 합니다.
+            </Paragraph>
+        ),
+
+        action: (
+            <BulletList
+                items={[
+                    "Exactly Once를 전제로 하지 않음",
+                    "Generation 상태 확인",
+                    "DB Constraint 최종 방어",
+                    "동일 작업 재실행 허용",
+                ]}
+            />
+        ),
+
+        criteria: (
+            <MetricList
+                items={[
+                    "재전달 Event 수",
+                    "중복 Candidate 수",
+                    "중복 Itinerary 수",
+                    "상태 이상 건수",
+                ]}
+            />
+        ),
+    },
+
+    {
+        number: "04",
+
+        title:
+            "반복 실패 Message의 Retry → DLQ",
+
+        summary:
+            "복구 불가능한 Message가 무한 Retry되지 않고 DLQ로 격리되는지 확인합니다.",
+
+        technologies: [
+            "Retry",
+            "DLX",
+            "DLQ",
+        ],
+
+        simulation: (
+            <BulletList
+                items={[
+                    "Worker 로직에 강제 Exception 주입",
+                    "동일 Message 반복 실패",
+                    "설정 Retry 횟수 도달",
+                    "DLQ 전환 확인",
+                ]}
+            />
+        ),
+
+        problem: (
+            <Paragraph>
+                영구 실패 Message가 정상 Queue에서 반복 처리되면
+                정상 Message 처리와 Worker 자원을 함께 방해합니다.
+            </Paragraph>
+        ),
+
+        action: (
+            <BulletList
+                items={[
+                    "제한된 횟수의 Retry",
+                    "DLX Routing",
+                    "DLQ 격리",
+                    "운영자가 실패 Message 별도 확인",
+                ]}
+            />
+        ),
+
+        criteria: (
+            <MetricList
+                items={[
+                    "Retry 횟수",
+                    "DLQ Message 수",
+                    "무한 Retry 여부",
+                    "정상 Queue 영향",
+                ]}
+            />
+        ),
+    },
+
+    {
+        number: "05",
+
+        title:
+            "Worker 장기 중단과 Stale Generation",
+
+        summary:
+            "COLLECTING_CANDIDATES 상태에 오래 머문 작업을 운영 관점에서 탐지할 수 있는지 확인합니다.",
+
+        technologies: [
+            "Stale",
+            "Metric",
+            "Recovery",
+        ],
+
+        simulation: (
+            <BulletList
+                items={[
+                    "RabbitMQ Message 유입",
+                    "Worker 장시간 종료",
+                    "Generation 중간 상태 유지",
+                    "Worker 재기동",
+                ]}
+            />
+        ),
+
+        problem: (
+            <Paragraph>
+                비동기 작업이 중간 상태에서 멈추면
+                사용자는 정상 처리 중인지
+                장애로 정지했는지 판단하기 어렵습니다.
+            </Paragraph>
+        ),
+
+        action: (
+            <BulletList
+                items={[
+                    "Generation 상태별 시작 시각 기록",
+                    "Stale Generation Metric",
+                    "운영 임계시간 설정",
+                    "재처리 또는 FAILED 정책 검토",
+                ]}
+            />
+        ),
+
+        criteria: (
+            <MetricList
+                items={[
+                    "Stale 탐지 시간",
+                    "Queue Depth",
+                    "재기동 후 완료 수",
+                    "복구 시간",
+                ]}
+            />
+        ),
     },
 ];
 
@@ -365,1885 +1262,1560 @@ const coreDecisions: readonly CoreDecision[] = [
 /* -------------------------------------------------------------------------- */
 
 export default function PlanMatePage() {
-    const [selectedSection, setSelectedSection] =
-        useState<SectionId>("overview");
-
-    const contentRef = useRef<HTMLDivElement>(null);
-
-    const selectSection = (section: SectionId) => {
-        setSelectedSection(section);
-
-        if (window.innerWidth < 768) {
-            setTimeout(() => {
-                contentRef.current?.scrollIntoView({
-                    behavior: "smooth",
-                    block: "start",
-                });
-            }, 30);
-        }
-    };
-
     return (
         <main
             className="
                 relative left-1/2
-                w-[min(1240px,calc(100vw-32px))]
+                w-[min(1120px,calc(100vw-32px))]
                 -translate-x-1/2
-                pb-24 pt-10
+                pb-28 pt-10
                 sm:pt-14
             "
         >
-            <div
-                className="
-                    grid
-                    md:grid-cols-[210px_minmax(0,1fr)]
-                    md:gap-10
-                    lg:gap-12
-                "
-            >
-                <ProjectSidebar
-                    selectedSection={selectedSection}
-                    onSelect={selectSection}
-                />
+            <ProjectHero/>
 
-                <div className="min-w-0">
-                    <ProjectHeader/>
+            <ProjectNavigation/>
 
-                    <ProjectMobileNavigation
-                        selectedSection={selectedSection}
-                        onSelect={selectSection}
-                    />
+            <div className="space-y-28">
+                <CoreSection/>
 
-                    <div
-                        ref={contentRef}
-                        className="mt-10"
-                    >
-                        <AnimatedContent
-                            selectedSection={selectedSection}
-                            onSelect={selectSection}
-                        />
-                    </div>
-                </div>
+                <TroubleshootingSection/>
+
+                <FailureInjectionSection/>
+
+                <AdditionalDesignSection/>
+
+                <RetrospectiveSection/>
             </div>
         </main>
     );
 }
 
 /* -------------------------------------------------------------------------- */
-/* Header                                                                     */
+/* Hero                                                                       */
 
 /* -------------------------------------------------------------------------- */
 
-function ProjectHeader() {
+function ProjectHero() {
     return (
-        <header className="border-b border-border pb-9">
-            <h1
-                className="
-                    text-4xl font-bold
-                    tracking-tighter
-                    sm:text-5xl
-                "
-            >
-                PlanMate
-            </h1>
-
-            <p className="mt-2 text-lg text-muted-foreground sm:text-xl">
-                AI 기반 여행 일정 생성 서비스
-            </p>
-
-            <p
-                className="
-                    mt-5 max-w-[850px]
-                    break-keep
-                    text-sm leading-7
-                    text-muted-foreground
-                    sm:text-base sm:leading-8
-                "
-            >
-                사용자 여행 조건을 기반으로 실제 장소 후보를 수집하고,
-                검증 가능한 AI 여행 일정을 생성하는 서비스입니다.
-            </p>
-
-            <div className="mt-5">
-                <ProjectTechStack/>
-            </div>
-        </header>
-    );
-}
-
-function ProjectTechStack() {
-    const [expanded, setExpanded] = useState(false);
-
-    const visibleCount = 7;
-
-    const visibleTechnologies = expanded
-        ? technologies
-        : technologies.slice(0, visibleCount);
-
-    const hiddenCount =
-        technologies.length - visibleCount;
-
-    return (
-        <div className="flex flex-wrap items-center gap-2">
-            {visibleTechnologies.map((technology) => (
-                <div
-                    key={technology.name}
+        <section>
+            <div className="text-center">
+                {/* Project Badge */}
+                <span
                     className="
-                        flex h-8 items-center gap-2
-                        rounded-lg
-                        border border-border
-                        bg-background
-                        px-2.5
+                        inline-flex h-10
+                        items-center
+                        rounded-full
+                        border border-[#D7E1FF]
+                        bg-white
+                        px-5
+                        text-sm font-medium
+                        text-[#315FEA]
+                        shadow-sm
+
+                        dark:border-blue-900
+                        dark:bg-background
+                        dark:text-blue-300
                     "
                 >
-                    <technology.icon className="size-4 shrink-0"/>
+                    Project
+                </span>
 
-                    <span className="text-xs font-medium">
-                        {technology.name}
-                    </span>
-                </div>
-            ))}
-
-            {hiddenCount > 0 && (
-                <button
-                    type="button"
-                    onClick={() =>
-                        setExpanded((prev) => !prev)
-                    }
+                {/* Project Title */}
+                <h1
                     className="
-                        flex h-8 items-center
-                        rounded-lg
-                        border border-border
-                        bg-background
-                        px-3
-                        text-xs font-semibold
-                        text-foreground
-                        transition-colors
-                        hover:bg-muted
+                        mt-7
+                        text-5xl font-bold
+                        tracking-[-0.055em]
+                        sm:text-6xl
+                        lg:text-7xl
                     "
                 >
-                    {expanded
-                        ? "접기"
-                        : `+${hiddenCount}`}
-                </button>
-            )}
-        </div>
-    );
-}
+                    PlanMate
+                </h1>
 
-/* -------------------------------------------------------------------------- */
-/* Sidebar                                                                    */
-
-/* -------------------------------------------------------------------------- */
-
-interface ProjectNavigationProps {
-    selectedSection: SectionId;
-    onSelect: (section: SectionId) => void;
-}
-
-function ProjectSidebar({
-                            selectedSection,
-                            onSelect,
-                        }: ProjectNavigationProps) {
-    return (
-        <aside
-            className="
-                hidden
-                border-r border-border
-                pr-6
-                md:block
-            "
-        >
-            <div className="sticky top-8">
-                <div className="mb-7">
+                {/* Technical Focus */}
+                <div className="mx-auto mt-7 max-w-[900px]">
                     <p
                         className="
                             text-[10px] font-bold
-                            uppercase tracking-[0.18em]
-                            text-foreground
+                            uppercase
+                            tracking-[0.18em]
+                            text-muted-foreground
                         "
                     >
-                        Project Index
+                        Technical Focus
                     </p>
 
-                    <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                        PlanMate 기술 구현 목차
-                    </p>
-                </div>
-
-                <nav className="space-y-6">
-                    {navigationGroups.map(
-                        (group, groupIndex) => (
-                            <div key={groupIndex}>
-                                {group.label && (
-                                    <p
-                                        className="
-                                            mb-2 px-3
-                                            text-[10px] font-semibold
-                                            tracking-[0.1em]
-                                            text-muted-foreground/60
-                                        "
-                                    >
-                                        {group.label}
-                                    </p>
-                                )}
-
-                                <div className="space-y-1">
-                                    {group.items.map(
-                                        (item) => {
-                                            const active =
-                                                selectedSection ===
-                                                item.id;
-
-                                            return (
-                                                <button
-                                                    key={item.id}
-                                                    type="button"
-                                                    onClick={() =>
-                                                        onSelect(item.id)
-                                                    }
-                                                    className={[
-                                                        "relative flex w-full items-center gap-2.5 border-l-2 px-3 py-2.5 text-left text-sm transition-all",
-                                                        active
-                                                            ? "border-foreground bg-muted font-semibold text-foreground"
-                                                            : "border-transparent text-muted-foreground hover:border-border hover:bg-muted/50 hover:text-foreground",
-                                                    ].join(" ")}
-                                                >
-                                                    <span className="shrink-0">
-                                                        {item.icon}
-                                                    </span>
-
-                                                    {item.number && (
-                                                        <span
-                                                            className={[
-                                                                "w-5 shrink-0 text-[10px] tabular-nums",
-                                                                active
-                                                                    ? "text-foreground"
-                                                                    : "text-muted-foreground/50",
-                                                            ].join(" ")}
-                                                        >
-                                                            {item.number}
-                                                        </span>
-                                                    )}
-
-                                                    <span className="truncate">
-                                                        {item.title}
-                                                    </span>
-                                                </button>
-                                            );
-                                        }
-                                    )}
-                                </div>
-                            </div>
-                        )
-                    )}
-                </nav>
-            </div>
-        </aside>
-    );
-}
-
-function ProjectMobileNavigation({
-                                     selectedSection,
-                                     onSelect,
-                                 }: ProjectNavigationProps) {
-    return (
-        <div className="mt-6 md:hidden">
-            <p
-                className="
-                    mb-2
-                    text-[10px] font-bold
-                    uppercase tracking-[0.16em]
-                    text-foreground
-                "
-            >
-                Project Index
-            </p>
-
-            <div className="flex gap-2 overflow-x-auto pb-2">
-                {navigationGroups
-                    .flatMap((group) => group.items)
-                    .map((item) => {
-                        const active =
-                            selectedSection === item.id;
-
-                        return (
-                            <button
-                                key={item.id}
-                                type="button"
-                                onClick={() =>
-                                    onSelect(item.id)
-                                }
-                                className={[
-                                    "flex shrink-0 items-center gap-2 rounded-lg border px-3 py-2 text-xs transition-colors",
-                                    active
-                                        ? "border-foreground bg-foreground font-semibold text-background"
-                                        : "border-border bg-background text-muted-foreground",
-                                ].join(" ")}
-                            >
-                                {item.icon}
-                                {item.title}
-                            </button>
-                        );
-                    })}
-            </div>
-        </div>
-    );
-}
-
-/* -------------------------------------------------------------------------- */
-/* Selected Content                                                           */
-
-/* -------------------------------------------------------------------------- */
-
-interface AnimatedContentProps {
-    selectedSection: SectionId;
-    onSelect: (section: SectionId) => void;
-}
-
-function AnimatedContent({
-                             selectedSection,
-                             onSelect,
-                         }: AnimatedContentProps) {
-    return (
-        <div
-            key={selectedSection}
-            className="
-                animate-in
-                fade-in
-                slide-in-from-bottom-2
-                duration-300
-            "
-        >
-            {selectedSection === "overview" && (
-                <OverviewSection onSelect={onSelect}/>
-            )}
-
-            {selectedSection === "generation" && (
-                <GenerationSection/>
-            )}
-
-            {selectedSection === "async" && (
-                <AsyncSection onSelect={onSelect}/>
-            )}
-
-            {selectedSection === "outbox" && (
-                <OutboxSection/>
-            )}
-
-            {selectedSection === "validation" && (
-                <ValidationSection/>
-            )}
-
-            {selectedSection === "snapshot" && (
-                <SnapshotSection/>
-            )}
-
-            {selectedSection === "auth" && (
-                <AuthenticationSection/>
-            )}
-
-            {selectedSection === "realtime" && (
-                <RealtimeSection/>
-            )}
-
-            {selectedSection === "monitoring" && (
-                <MonitoringSection/>
-            )}
-        </div>
-    );
-}
-
-/* -------------------------------------------------------------------------- */
-/* Overview                                                                   */
-
-/* -------------------------------------------------------------------------- */
-
-function OverviewSection({
-                             onSelect,
-                         }: {
-    onSelect: (section: SectionId) => void;
-}) {
-    return (
-        <div className="space-y-16">
-            <section>
-                <SectionEyebrow>
-                    주요 기능과 기술 설계
-                </SectionEyebrow>
-
-                <h2
-                    className="
-                        mt-3 max-w-[900px]
-                        break-keep
-                        text-3xl font-bold
-                        leading-[1.3] tracking-tighter
-                        sm:text-4xl
-                    "
-                >
-                    PlanMate의 주요 구현을
-                    기능 흐름별로 정리했습니다.
-                </h2>
-
-                <p
-                    className="
-                        mt-5 max-w-[820px]
-                        break-keep
-                        text-sm leading-7
-                        text-muted-foreground
-                        sm:text-base sm:leading-8
-                    "
-                >
-                    실제 장소 후보 수집과 AI 일정 생성부터
-                    비동기 작업 처리, 메시지 정합성,
-                    AI 결과 검증, 생성 데이터 보존,
-                    인증과 실시간 상태 전달, 모니터링까지
-                    각 구현에서 어떤 구조와 기술을 선택했는지 확인할 수 있습니다.
-                </p>
-
-                <div className="mt-8 space-y-3">
-                    {coreDecisions.map((decision) => (
-                        <CoreDecisionCard
-                            key={decision.id}
-                            decision={decision}
-                            onClick={() =>
-                                onSelect(decision.id)
-                            }
-                        />
-                    ))}
-                </div>
-            </section>
-
-            <section>
-                <div className="flex items-end justify-between gap-5">
-                    <div>
-                        <SectionEyebrow>
-                            전체 흐름
-                        </SectionEyebrow>
-
-                        <h3 className="mt-3 text-2xl font-bold">
-                            일정 생성 파이프라인
-                        </h3>
-
-                        <p
-                            className="
-                                mt-2 max-w-[720px]
-                                break-keep
-                                text-sm leading-7
-                                text-muted-foreground
-                            "
-                        >
-                            위의 구현은 하나의 일정 생성 흐름 안에서
-                            다음과 같이 연결됩니다.
-                        </p>
-                    </div>
-
-                    <button
-                        type="button"
-                        onClick={() =>
-                            onSelect("generation")
-                        }
-                        className="
-                            hidden shrink-0
-                            items-center gap-1
-                            text-sm font-semibold
-                            text-foreground
-                            transition-colors
-                            hover:text-foreground/60
-                            sm:flex
-                        "
-                    >
-                        구현 상세
-                        <ArrowRight className="size-4"/>
-                    </button>
-                </div>
-
-                <FlowPanel
-                    label="Generation Flow"
-                    tone="neutral"
-                >
-                    <FlowDiagram
-                        items={[
-                            "생성 요청",
-                            "generationId",
-                            "RabbitMQ",
-                            "Worker",
-                            "장소 후보",
-                            "AI 생성",
-                            "Validation",
-                            "일정 저장",
-                        ]}
-                    />
-                </FlowPanel>
-            </section>
-
-            <section>
-                <SectionEyebrow>
-                    지원 기능과 기술 설계
-                </SectionEyebrow>
-
-                <h3 className="mt-3 text-2xl font-bold">
-                    서비스 운영을 위한 추가 구현
-                </h3>
-
-                <p
-                    className="
-                        mt-2 max-w-[760px]
-                        break-keep
-                        text-sm leading-7
-                        text-muted-foreground
-                    "
-                >
-                    일정 생성 기능 외에도 인증, 실시간 상태 전달,
-                    장애 상태 관찰을 위한 구조를 함께 구현했습니다.
-                </p>
-
-                <div className="mt-6 grid gap-3 sm:grid-cols-3">
-                    <SmallDecisionCard
-                        number="06"
-                        icon={<KeyRound className="size-5"/>}
-                        title="인증"
-                        description="사용자 Identity와 로컬/OAuth2 인증 수단을 분리했습니다."
-                        technologies={[
-                            "Security",
-                            "JWT",
-                            "Redis",
-                        ]}
-                        onClick={() =>
-                            onSelect("auth")
-                        }
-                    />
-
-                    <SmallDecisionCard
-                        number="07"
-                        icon={<Radio className="size-5"/>}
-                        title="실시간 상태"
-                        description="WebSocket으로 상태를 전달하고 DB를 Source of Truth로 유지했습니다."
-                        technologies={[
-                            "WebSocket",
-                            "STOMP",
-                            "REST",
-                        ]}
-                        onClick={() =>
-                            onSelect("realtime")
-                        }
-                    />
-
-                    <SmallDecisionCard
-                        number="08"
-                        icon={<Activity className="size-5"/>}
-                        title="모니터링"
-                        description="비동기 처리와 CDC 상태를 Metric으로 관찰하도록 구성했습니다."
-                        technologies={[
-                            "Prometheus",
-                            "Grafana",
-                        ]}
-                        onClick={() =>
-                            onSelect("monitoring")
-                        }
-                    />
-                </div>
-            </section>
-        </div>
-    );
-}
-
-/* -------------------------------------------------------------------------- */
-/* 01 Generation                                                              */
-
-/* -------------------------------------------------------------------------- */
-
-function GenerationSection() {
-    return (
-        <DesignSectionLayout
-            number="01"
-            category="일정 생성"
-            title="실제 장소 후보를 먼저 수집하고 AI가 후보 안에서 일정을 생성하도록 제한했습니다."
-            description={
-                <>
-                    서버가 Google Places를 통해 실제 장소 후보를 먼저
-                    구성하고, AI는 해당 후보 안에서 일정을 생성하도록
-                    제한했습니다. 생성 결과는 서버 검증 규칙을 다시
-                    통과한 뒤 저장합니다.
-                </>
-            }
-            technologies={[
-                "Google Places",
-                "Candidate Snapshot",
-                "AI Request",
-                "Validation",
-            ]}
-        >
-            <ContentBlock
-                step="01"
-                label="문제 정의"
-                tone="problem"
-                title="AI의 자유 생성만으로는 실제 장소 여부와 일정 유효성을 보장하기 어려웠습니다."
-            >
-                <Paragraph>
-                    AI에게 목적지와 여행 조건만 전달해 자유롭게 일정을
-                    생성하도록 하면{" "}
-                    <Strong>
-                        존재하지 않는 장소나 검증할 수 없는 장소
-                    </Strong>
-                    가 포함될 수 있습니다.
-                </Paragraph>
-            </ContentBlock>
-
-            <ContentBlock
-                step="02"
-                label="설계"
-                tone="analysis"
-                title="Google Places에서 실제 장소 후보를 먼저 구성했습니다."
-            >
-                <FlowPanel
-                    label="Candidate Flow"
-                    tone="analysis"
-                >
-                    <FlowDiagram
-                        items={[
-                            "여행 조건",
-                            "Google Places",
-                            "후보 수집",
-                            "후보 점수화",
-                            "Snapshot",
-                        ]}
-                    />
-                </FlowPanel>
-            </ContentBlock>
-
-            <ContentBlock
-                step="03"
-                label="적용"
-                tone="decision"
-                title="AI의 역할을 실제 후보 안에서 일정을 조합하는 것으로 제한했습니다."
-            >
-                <Callout tone="decision">
-                    AI를 장소 데이터를 만들어내는 Source로 사용하지 않고,
-                    서버가 검증한 실제 장소 후보를 조합하는 역할로
-                    제한했습니다.
-                </Callout>
-            </ContentBlock>
-
-            <ContentBlock
-                step="04"
-                label="결과"
-                tone="decision"
-                title="서버가 생성 가능한 장소 범위와 검증 기준을 통제합니다."
-                last
-            >
-                <Paragraph>
-                    AI가 반환한 결과 역시 Candidate Snapshot과
-                    서버 규칙을 기준으로 다시 검증할 수 있어{" "}
-                    <Strong>
-                        생성과 검증의 기준을 애플리케이션이 소유
-                    </Strong>
-                    할 수 있습니다.
-                </Paragraph>
-            </ContentBlock>
-        </DesignSectionLayout>
-    );
-}
-
-/* -------------------------------------------------------------------------- */
-/* 02 Async                                                                   */
-
-/* -------------------------------------------------------------------------- */
-
-function AsyncSection({
-                          onSelect,
-                      }: {
-    onSelect: (section: SectionId) => void;
-}) {
-    return (
-        <DesignSectionLayout
-            number="02"
-            category="비동기 처리"
-            title="HTTP 요청과 일정 생성 작업을 분리했습니다."
-            description={
-                <>
-                    외부 API 지연과 사용자 요청의 생명주기를 분리하기 위해
-                    HTTP 요청은 작업 접수까지만 담당하도록 했습니다.
-                    실제 후보 수집 작업은 RabbitMQ Worker가 비동기로
-                    처리합니다.
-                </>
-            }
-            technologies={[
-                "RabbitMQ",
-                "Worker",
-                "ACK",
-                "Retry",
-                "DLQ",
-            ]}
-        >
-            <ContentBlock
-                step="01"
-                label="문제 정의"
-                tone="problem"
-                title="외부 API 지연이 HTTP 응답에 직접 영향을 줬습니다."
-            >
-                <Paragraph>
-                    초기에는 하나의 HTTP 요청 안에서 장소 후보를 수집하고
-                    외부 API를 호출한 뒤 결과를 저장하고 응답하는 흐름을
-                    고려했습니다.
-                </Paragraph>
-
-                <FlowPanel
-                    label="Before"
-                    tone="problem"
-                >
-                    <FlowDiagram
-                        items={[
-                            "HTTP 요청",
-                            "후보 수집",
-                            "외부 API",
-                            "데이터 저장",
-                            "HTTP 응답",
-                        ]}
-                    />
-                </FlowPanel>
-
-                <Paragraph>
-                    Google Places처럼{" "}
-                    <Strong>
-                        응답 시간을 애플리케이션에서 통제할 수 없는 외부 API
-                    </Strong>
-                    가 포함되면 외부 시스템의 지연과 장애가 그대로{" "}
-                    <Strong>
-                        HTTP 응답 시간
-                    </Strong>
-                    에 영향을 줍니다.
-                </Paragraph>
-            </ContentBlock>
-
-            <ContentBlock
-                step="02"
-                label="책임 분리"
-                tone="analysis"
-                title="HTTP 요청은 작업 접수까지만 담당하도록 변경했습니다."
-            >
-                <Paragraph>
-                    오래 걸리는 작업 전체를 HTTP 요청이 책임지지 않도록{" "}
-                    <Strong>
-                        요청 처리와 실제 작업 실행의 책임을 분리
-                    </Strong>
-                    했습니다.
-                </Paragraph>
-
-                <FlowPanel
-                    label="Separated Responsibilities"
-                    tone="analysis"
-                >
                     <div
                         className="
-                            grid gap-3
-                            md:grid-cols-[1fr_auto_1fr]
-                            md:items-stretch
+                            mt-4
+                            flex flex-col
+                            items-center
+                            justify-center
+                            gap-2
+
+                            sm:flex-row
+                            sm:flex-wrap
+                            sm:gap-3
                         "
                     >
-                        <ResponsibilityCard
-                            label="HTTP Request"
-                            badge="요청 책임"
-                            title="생성 요청 → generationId 반환"
-                            description="HTTP 요청은 작업 접수와 식별자 반환까지만 담당합니다."
-                        />
+                        {/* Async */}
+                        <span
+                            className="
+                                text-base font-bold
+                                text-[#315FEA]
 
-                        <div className="hidden items-center md:flex">
-                            <ArrowRight className="size-5 text-muted-foreground/30"/>
-                        </div>
+                                sm:text-lg
 
-                        <ResponsibilityCard
-                            label="Background"
-                            badge="작업 책임"
-                            title="RabbitMQ → Worker → 후보 수집"
-                            description="외부 API 호출을 포함한 긴 작업은 HTTP 요청과 독립적으로 처리합니다."
-                        />
+                                dark:text-blue-300
+                            "
+                        >
+                            비동기 파이프라인 설계
+                        </span>
+
+                        <FocusDivider/>
+
+                        {/* Reliability */}
+                        <span
+                            className="
+                                text-base font-bold
+                                text-[#315FEA]
+
+                                sm:text-lg
+
+                                dark:text-blue-300
+                            "
+                        >
+                            메시지 정합성 · 멱등성
+                        </span>
+
+                        <FocusDivider/>
+
+                        {/* Failure */}
+                        <span
+                            className="
+                                text-base font-bold
+                                text-[#315FEA]
+
+                                sm:text-lg
+
+                                dark:text-blue-300
+                            "
+                        >
+                            장애 복구 검증
+                        </span>
                     </div>
-                </FlowPanel>
-            </ContentBlock>
 
-            <ContentBlock
-                step="03"
-                label="대안 비교"
-                tone="analysis"
-                title="비동기 작업을 어떤 방식으로 실행할지 비교했습니다."
-            >
-                <Paragraph>
-                    HTTP 요청에서 작업을 분리한다고 해서 Message Queue가
-                    반드시 필요한 것은 아닙니다. 구현 복잡도와 작업 보존,
-                    재처리 방식을 기준으로 세 가지 대안을 비교했습니다.
-                </Paragraph>
-
-                <div className="grid gap-3 lg:grid-cols-3">
-                    <AlternativeCard
-                        label="대안 1"
-                        title="@Async"
-                        items={[
-                            "Spring 내부에서 간단히 구현 가능",
-                            "별도 인프라가 필요 없음",
-                            "프로세스에 작업 실행이 종속됨",
-                            "재시작 시 작업 복구를 직접 고려해야 함",
-                        ]}
-                    />
-
-                    <AlternativeCard
-                        label="대안 2"
-                        title="DB Polling Worker"
-                        items={[
-                            "DB를 작업 저장소로 사용 가능",
-                            "재시작 이후에도 작업 유지",
-                            "Polling 주기 관리 필요",
-                            "여러 Worker 사용 시 Lock 전략 필요",
-                        ]}
-                    />
-
-                    <AlternativeCard
-                        selected
-                        label="대안 3"
-                        title="Message Queue Worker"
-                        items={[
-                            "작업 요청과 실행 주체 분리",
-                            "ACK 기반 완료 확인",
-                            "Redelivery / Retry 처리",
-                            "DLQ 기반 실패 작업 분리",
-                        ]}
-                    />
-                </div>
-            </ContentBlock>
-
-            <ContentBlock
-                step="04"
-                label="최종 선택"
-                tone="decision"
-                title="Message Queue 기반 작업 큐로 RabbitMQ를 사용했습니다."
-            >
-                <Paragraph>
-                    PlanMate의 작업은 이벤트를 장기간 보관하고 재생하는
-                    Event Streaming보다{" "}
-                    <Strong>
-                        하나의 작업을 Worker가 가져가 처리하고 완료 여부를
-                        확인하는 Job Queue
-                    </Strong>
-                    의 성격에 더 가깝다고 판단했습니다.
-                </Paragraph>
-
-                <FlowPanel
-                    label="After"
-                    tone="decision"
-                >
-                    <FlowDiagram
-                        items={[
-                            "생성 요청",
-                            "generationId",
-                            "RabbitMQ",
-                            "Worker",
-                            "후보 수집",
-                            "상태 변경",
-                        ]}
-                    />
-                </FlowPanel>
-            </ContentBlock>
-
-            <ContentBlock
-                step="05"
-                label="Trade-off"
-                tone="tradeoff"
-                title="작업 복구 구조를 얻는 대신 운영 복잡도를 함께 가져갔습니다."
-            >
-                <TradeOffComparison
-                    benefits={[
-                        "HTTP 요청과 작업 실행의 생명주기를 분리했습니다.",
-                        "작업을 메시지로 명시적으로 보관할 수 있습니다.",
-                        "ACK와 Redelivery로 처리 완료를 확인할 수 있습니다.",
-                        "Retry와 DLQ로 실패 작업을 분리할 수 있습니다.",
-                    ]}
-                    costs={[
-                        "RabbitMQ라는 별도 인프라가 추가됩니다.",
-                        "Queue와 Exchange를 관리해야 합니다.",
-                        "Broker 장애와 재전달 흐름을 고려해야 합니다.",
-                        "Consumer 중복 처리에 대응해야 합니다.",
-                    ]}
-                />
-
-                <DecisionNote
-                    label="현실적인 판단"
-                    title="현재 PlanMate 규모에 RabbitMQ가 반드시 필요한 것은 아닙니다."
-                >
-                    <p>
-                        현재 PlanMate의 트래픽과 작업 규모라면{" "}
-                        <Strong>
-                            @Async 또는 DB Polling Worker
-                        </Strong>
-                        로도 충분히 구현할 수 있습니다.
+                    {/* Technical Summary */}
+                    <p
+                        className="
+                            mx-auto mt-4
+                            max-w-[800px]
+                            break-keep
+                            text-sm leading-7
+                            text-muted-foreground
+                        "
+                    >
+                        HTTP–Worker 분리부터 Outbox·CDC,
+                        At-least-once와 멱등성,
+                        장애 주입을 통한 복구 검증까지
+                        메시징 기반 비동기 처리의 실패 지점을 다뤘습니다.
                     </p>
-
-                    <p>
-                        이번 프로젝트에서는 단순 기능 구현을 넘어{" "}
-                        <Strong>
-                            ACK, Redelivery, Retry, DLQ와 Consumer 멱등성
-                        </Strong>
-                        을 직접 다루고 검증하는 것까지 학습 범위에
-                        포함했습니다.
-                    </p>
-
-                    <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                        <JudgementCard
-                            title="더 단순한 선택"
-                            value="@Async / DB Polling Worker"
-                            description="별도 Broker 없이 더 낮은 운영 복잡도로 현재 규모의 작업을 처리할 수 있습니다."
-                        />
-
-                        <JudgementCard
-                            selected
-                            title="이번 프로젝트의 선택"
-                            value="RabbitMQ Worker"
-                            description="메시지 전달과 재처리에서 발생하는 문제를 직접 구현하고 검증하기 위해 선택했습니다."
-                        />
-                    </div>
-                </DecisionNote>
-            </ContentBlock>
-
-            <ContentBlock
-                step="06"
-                label="다음 문제"
-                tone="problem"
-                title="작업을 Message Queue로 분리하자 새로운 정합성 문제가 생겼습니다."
-                last
-            >
-                <NextDecisionCard
-                    title="DB 저장은 성공했는데 메시지 발행에 실패하면?"
-                    description="Database Transaction과 RabbitMQ Publish는 서로 다른 시스템에서 처리되기 때문에 두 작업 사이의 정합성을 별도로 보완해야 했습니다."
-                    action="Outbox & CDC"
-                    onClick={() =>
-                        onSelect("outbox")
-                    }
-                />
-            </ContentBlock>
-        </DesignSectionLayout>
-    );
-}
-
-/* -------------------------------------------------------------------------- */
-/* 03 Outbox                                                                  */
-
-/* -------------------------------------------------------------------------- */
-
-function OutboxSection() {
-    return (
-        <DesignSectionLayout
-            number="03"
-            category="메시지 정합성"
-            title="DB 저장과 메시지 발행의 정합성을 Outbox와 CDC로 보완했습니다."
-            description={
-                <>
-                    Business Data와 Outbox Event를 동일한 Transaction으로
-                    저장하고, Outbox Event는 Debezium이 PostgreSQL WAL의
-                    변경을 읽어 RabbitMQ로 전달하도록 구성했습니다.
-                </>
-            }
-            technologies={[
-                "Transactional Outbox",
-                "Debezium",
-                "PostgreSQL WAL",
-                "RabbitMQ",
-            ]}
-        >
-            <ContentBlock
-                step="01"
-                label="문제 정의"
-                tone="problem"
-                title="DB Commit과 메시지 발행은 하나의 Transaction으로 묶을 수 없었습니다."
-            >
-                <Paragraph>
-                    DB Commit에는 성공했지만 RabbitMQ Publish에 실패하면
-                    작업 데이터는 존재하지만 Worker는 작업을 전달받지 못하는
-                    상태가 발생할 수 있습니다.
-                </Paragraph>
-
-                <FlowPanel
-                    label="Dual Write Problem"
-                    tone="problem"
-                >
-                    <FlowDiagram
-                        items={[
-                            "Business 저장",
-                            "DB Commit",
-                            "RabbitMQ Publish",
-                        ]}
-                    />
-                </FlowPanel>
-            </ContentBlock>
-
-            <ContentBlock
-                step="02"
-                label="해결 방향"
-                tone="analysis"
-                title="Business Data와 Outbox Event를 하나의 Transaction으로 저장했습니다."
-            >
-                <Paragraph>
-                    비즈니스 데이터와 메시지 발행에 필요한 Event를
-                    동일한 DB Transaction에 포함해{" "}
-                    <Strong>
-                        둘 중 하나만 저장되는 상태를 방지
-                    </Strong>
-                    했습니다.
-                </Paragraph>
-
-                <FlowPanel
-                    label="Transactional Outbox"
-                    tone="analysis"
-                >
-                    <FlowDiagram
-                        items={[
-                            "Application",
-                            "Business Data",
-                            "+ Outbox Event",
-                            "Commit",
-                        ]}
-                    />
-                </FlowPanel>
-            </ContentBlock>
-
-            <ContentBlock
-                step="03"
-                label="대안 비교"
-                tone="analysis"
-                title="Outbox Event를 어떤 방식으로 전달할지 비교했습니다."
-            >
-                <div className="grid gap-3 lg:grid-cols-3">
-                    <AlternativeCard
-                        label="대안 1"
-                        title="Application Polling"
-                        items={[
-                            "구조가 상대적으로 단순",
-                            "추가 CDC 인프라 불필요",
-                            "주기적 SELECT 필요",
-                            "동시 처리 Lock 정책 필요",
-                        ]}
-                    />
-
-                    <AlternativeCard
-                        label="대안 2"
-                        title="DB Trigger"
-                        items={[
-                            "변경 시점에 즉각 처리 가능",
-                            "DB 내부 로직 증가",
-                            "애플리케이션과 DB 책임 혼합",
-                        ]}
-                    />
-
-                    <AlternativeCard
-                        selected
-                        label="대안 3"
-                        title="Log-based CDC"
-                        items={[
-                            "Transaction Log 기반",
-                            "Application Polling 불필요",
-                            "WAL / Slot / Offset 관리 필요",
-                        ]}
-                    />
-                </div>
-            </ContentBlock>
-
-            <ContentBlock
-                step="04"
-                label="최종 선택"
-                tone="decision"
-                title="Debezium 기반 Log-based CDC를 적용했습니다."
-            >
-                <Paragraph>
-                    PostgreSQL이 이미 기록하는 WAL을 활용해 변경을 감지하고,
-                    Debezium이 이를 읽어 Outbox Event를 전달하도록
-                    구성했습니다.
-                </Paragraph>
-
-                <FlowPanel
-                    label="Selected Flow"
-                    tone="decision"
-                >
-                    <FlowDiagram
-                        items={[
-                            "Business + Outbox",
-                            "PostgreSQL WAL",
-                            "Debezium",
-                            "RabbitMQ",
-                            "Worker",
-                        ]}
-                    />
-                </FlowPanel>
-            </ContentBlock>
-
-            <ContentBlock
-                step="05"
-                label="Trade-off"
-                tone="tradeoff"
-                title="Polling을 제거한 대신 CDC 운영 비용을 가져갔습니다."
-            >
-                <TradeOffComparison
-                    benefits={[
-                        "Polling 없이 DB 변경을 감지합니다.",
-                        "WAL 기반 CDC 구조를 경험했습니다.",
-                        "Offset 기반 처리 위치를 관리합니다.",
-                        "장애 이후 재개 흐름을 학습할 수 있습니다.",
-                    ]}
-                    costs={[
-                        "Debezium 운영 컴포넌트가 추가됩니다.",
-                        "Replication Slot을 관리해야 합니다.",
-                        "장기 장애 시 WAL 보존량이 증가할 수 있습니다.",
-                        "Offset과 Connector 상태를 관리해야 합니다.",
-                    ]}
-                />
-
-                <DecisionNote
-                    label="현실적인 판단"
-                    title="현재 PlanMate 규모에 Debezium이 반드시 필요한 것은 아닙니다."
-                >
-                    <p>
-                        현재 서비스 규모에서는{" "}
-                        <Strong>
-                            Application이 Outbox Table을 Polling하는 방식
-                        </Strong>
-                        이 구현과 운영 측면에서 더 단순한 선택일 수 있습니다.
-                    </p>
-
-                    <p>
-                        이번 프로젝트에서는 PostgreSQL WAL,
-                        Replication Slot, Offset과 Connector 장애 복구까지
-                        직접 이해하기 위해 Log-based CDC를 적용했습니다.
-                    </p>
-                </DecisionNote>
-            </ContentBlock>
-
-            <ContentBlock
-                step="06"
-                label="장애 검증"
-                tone="analysis"
-                title="정상 흐름뿐 아니라 장애 상황에서의 복구 동작까지 확인합니다."
-                last
-            >
-                <div className="space-y-2">
-                    <ExperimentLink
-                        title="Debezium 중단"
-                        description="중단 이후 WAL부터 다시 이어 읽는지 확인합니다."
-                    />
-
-                    <ExperimentLink
-                        title="장기 중단"
-                        description="Replication Slot과 WAL 보존 비용을 확인합니다."
-                    />
-
-                    <ExperimentLink
-                        title="Offset 유실"
-                        description="처리 위치 정보가 사라졌을 때 재처리 범위를 확인합니다."
-                    />
-
-                    <ExperimentLink
-                        title="WAL / Slot 유실"
-                        description="Offset과 실제 Source Log의 관계를 확인합니다."
-                    />
-
-                    <ExperimentLink
-                        title="RabbitMQ 장애"
-                        description="Source 처리와 Sink 전달 성공의 경계를 확인합니다."
-                    />
-
-                    <ExperimentLink
-                        title="Worker Commit 후 ACK 실패"
-                        description="Redelivery를 통해 Consumer 멱등성 필요성을 검증합니다."
-                    />
                 </div>
 
-                <Link
-                    href="https://velog.io/@bapegg/posts"
-                    target="_blank"
-                    rel="noopener noreferrer"
+                {/* Service Description */}
+                <p
                     className="
-                        group mt-5
-                        flex items-center justify-between
-                        gap-4 rounded-xl
-                        border border-border
-                        bg-background
-                        px-5 py-4
-                        transition-colors
-                        hover:bg-muted/50
-                    "
-                >
-                    <div>
-                        <p className="text-sm font-semibold">
-                            PlanMate 개발기와 장애 실험 기록
-                        </p>
-
-                        <p className="mt-1 text-xs text-muted-foreground">
-                            구현 과정과 실험 결과는 Velog에 기록합니다.
-                        </p>
-                    </div>
-
-                    <ArrowUpRight className="size-4 shrink-0"/>
-                </Link>
-            </ContentBlock>
-        </DesignSectionLayout>
-    );
-}
-
-/* -------------------------------------------------------------------------- */
-/* 04 Validation                                                              */
-
-/* -------------------------------------------------------------------------- */
-
-function ValidationSection() {
-    return (
-        <DesignSectionLayout
-            number="04"
-            category="AI 검증"
-            title="AI 생성 결과를 서버에서 검증한 뒤 저장하도록 구성했습니다."
-            description={
-                <>
-                    AI 응답을 신뢰 경계 밖의 입력으로 보고 Candidate,
-                    일정 구조, 시간 조건과 Domain Rule을 검증하는
-                    Validation Pipeline을 구성했습니다.
-                </>
-            }
-            technologies={[
-                "ValidationReport",
-                "Whitelist",
-                "Idempotency",
-                "Time Validation",
-            ]}
-        >
-            <ContentBlock
-                step="01"
-                label="문제 정의"
-                tone="problem"
-                title="정상적인 JSON이라고 유효한 일정인 것은 아니었습니다."
-            >
-                <Paragraph>
-                    AI는 Candidate에 존재하지 않는 placeId를 선택하거나
-                    필수 장소를 누락하고, 일정 시간을 겹치게 생성할 수도
-                    있습니다.
-                </Paragraph>
-            </ContentBlock>
-
-            <ContentBlock
-                step="02"
-                label="검증 설계"
-                tone="analysis"
-                title="저장 전에 서버 Validation Pipeline을 통과시킵니다."
-            >
-                <FlowPanel
-                    label="Validation Flow"
-                    tone="analysis"
-                >
-                    <FlowDiagram
-                        items={[
-                            "AI Draft",
-                            "구조 검증",
-                            "Candidate",
-                            "시간 검증",
-                            "Report",
-                            "저장",
-                        ]}
-                    />
-                </FlowPanel>
-            </ContentBlock>
-
-            <ContentBlock
-                step="03"
-                label="검증 분류"
-                tone="analysis"
-                title="검증 결과를 Error, Warning, Unverified로 구분했습니다."
-            >
-                <div className="grid gap-3 sm:grid-cols-3">
-                    <StatusCard
-                        tone="problem"
-                        title="Error"
-                        description="저장을 차단합니다."
-                    />
-
-                    <StatusCard
-                        tone="tradeoff"
-                        title="Warning"
-                        description="저장은 허용하되 경고를 남깁니다."
-                    />
-
-                    <StatusCard
-                        tone="neutral"
-                        title="Unverified"
-                        description="현재 데이터로 검증할 수 없는 조건입니다."
-                    />
-                </div>
-            </ContentBlock>
-
-            <ContentBlock
-                step="04"
-                label="적용 결과"
-                tone="decision"
-                title="AI 응답을 시스템 내부 데이터로 바로 신뢰하지 않습니다."
-                last
-            >
-                <Callout tone="decision">
-                    AI 응답은 시스템에 저장되기 전에 서버가 알고 있는
-                    Candidate와 Domain Rule을 기준으로 다시 검증합니다.
-                </Callout>
-            </ContentBlock>
-        </DesignSectionLayout>
-    );
-}
-
-/* -------------------------------------------------------------------------- */
-/* 05 Snapshot                                                                */
-
-/* -------------------------------------------------------------------------- */
-
-function SnapshotSection() {
-    return (
-        <DesignSectionLayout
-            number="05"
-            category="생성 데이터 보존"
-            title="일정 생성 시점의 입력과 후보 데이터를 Snapshot으로 보존했습니다."
-            description={
-                <>
-                    이후 Trip이 수정되거나 외부 Place 데이터가 변경되더라도
-                    과거 Generation이 어떤 입력과 후보를 기반으로 생성됐는지
-                    추적할 수 있도록 생성 당시 데이터를 별도로 저장합니다.
-                </>
-            }
-            technologies={[
-                "InputSnapshot",
-                "CandidateSnapshot",
-                "Reproducibility",
-            ]}
-        >
-            <ContentBlock
-                step="01"
-                label="문제 정의"
-                tone="problem"
-                title="현재 데이터만으로는 과거 Generation의 생성 근거를 설명하기 어려웠습니다."
-            >
-                <Paragraph>
-                    사용자가 여행 조건을 수정하거나 Google Places의 장소
-                    데이터가 변경되면 현재 값만으로는 과거 일정이 어떤
-                    조건에서 생성됐는지 알기 어렵습니다.
-                </Paragraph>
-            </ContentBlock>
-
-            <ContentBlock
-                step="02"
-                label="설계"
-                tone="analysis"
-                title="입력 조건과 장소 후보를 각각 Snapshot으로 보존했습니다."
-            >
-                <div className="grid gap-3 sm:grid-cols-2">
-                    <SnapshotCard
-                        title="InputSnapshot"
-                        label="Generation 생성 시"
-                        items={[
-                            "목적지 / 여행 기간",
-                            "예산 / 관심사",
-                            "교통 / 숙소",
-                            "필수 방문 조건",
-                        ]}
-                    />
-
-                    <SnapshotCard
-                        title="CandidateSnapshot"
-                        label="후보 수집 완료 시"
-                        items={[
-                            "실제로 사용한 장소 후보",
-                            "점수 / 순위",
-                            "Place 정보",
-                            "Must Visit 여부",
-                        ]}
-                    />
-                </div>
-            </ContentBlock>
-
-            <ContentBlock
-                step="03"
-                label="결과"
-                tone="decision"
-                title="과거 Generation의 생성 당시 상태를 추적할 수 있게 됐습니다."
-                last
-            >
-                <Callout tone="decision">
-                    Generation이 이후 변경되는 Trip 상태나 외부 Provider
-                    데이터와 분리되어 어떤 입력과 후보를 기반으로
-                    생성됐는지 추적할 수 있습니다.
-                </Callout>
-            </ContentBlock>
-        </DesignSectionLayout>
-    );
-}
-
-/* -------------------------------------------------------------------------- */
-/* 06 Authentication                                                          */
-
-/* -------------------------------------------------------------------------- */
-
-function AuthenticationSection() {
-    return (
-        <DesignSectionLayout
-            number="06"
-            category="인증"
-            title="사용자 Identity와 인증 수단을 분리했습니다."
-            description={
-                <>
-                    users는 사용자 자체의 Identity를 담당하고,
-                    로컬 인증과 OAuth2 인증 정보는 별도 모델로 분리해
-                    인증 방식이 사용자 핵심 모델에 섞이지 않도록 구성했습니다.
-                </>
-            }
-            technologies={[
-                "Spring Security",
-                "JWT",
-                "OAuth2",
-                "Redis",
-            ]}
-        >
-            <ContentBlock
-                step="01"
-                label="문제 정의"
-                tone="problem"
-                title="하나의 users 모델에 모든 인증 정보를 넣으면 책임이 섞입니다."
-            >
-                <Paragraph>
-                    password, provider, providerId를 모두 users에 저장하면
-                    인증 방식이 늘어날수록 서로 다른 인증 정보가 하나의
-                    사용자 모델에 혼합됩니다.
-                </Paragraph>
-            </ContentBlock>
-
-            <ContentBlock
-                step="02"
-                label="대안 비교"
-                tone="analysis"
-                title="사용자와 인증 수단을 어떻게 나눌지 비교했습니다."
-            >
-                <div className="grid gap-3 lg:grid-cols-3">
-                    <AlternativeCard
-                        label="대안 1"
-                        title="하나의 users"
-                        items={[
-                            "초기 구현 단순",
-                            "Nullable 인증 필드 증가",
-                            "인증 수단 책임 혼합",
-                        ]}
-                    />
-
-                    <AlternativeCard
-                        label="대안 2"
-                        title="인증별 사용자"
-                        items={[
-                            "인증 구조는 명확",
-                            "사용자 정보 중복",
-                            "동일 사용자 통합 어려움",
-                        ]}
-                    />
-
-                    <AlternativeCard
-                        selected
-                        label="대안 3"
-                        title="Identity / Credential 분리"
-                        items={[
-                            "users = 사용자",
-                            "local_credentials = 로컬 인증",
-                            "oauth_accounts = OAuth2",
-                        ]}
-                    />
-                </div>
-            </ContentBlock>
-
-            <ContentBlock
-                step="03"
-                label="최종 선택"
-                tone="decision"
-                title="사용자 Identity와 인증 수단을 별도 모델로 구성했습니다."
-            >
-                <ArchitectureBox tone="decision">
-                    <div className="flex flex-col items-center gap-5">
-                        <ArchitectureNode
-                            title="users"
-                            subtitle="사용자 Identity"
-                        />
-
-                        <div className="h-7 w-px bg-border"/>
-
-                        <div className="grid w-full max-w-xl grid-cols-2 gap-5">
-                            <ArchitectureNode
-                                title="local_credentials"
-                                subtitle="Local Login"
-                            />
-
-                            <ArchitectureNode
-                                title="oauth_accounts"
-                                subtitle="OAuth2 Login"
-                            />
-                        </div>
-                    </div>
-                </ArchitectureBox>
-            </ContentBlock>
-
-            <ContentBlock
-                step="04"
-                label="추가 설계"
-                tone="analysis"
-                title="Refresh Session은 Redis에서 관리하도록 구성했습니다."
-                last
-            >
-                <Paragraph>
-                    Access Token은 JWT로 사용하고 Refresh Session은 Redis에
-                    두어 로그아웃이나 비밀번호 변경 시 서버에서 Refresh
-                    Session을 폐기할 수 있도록 구성했습니다.
-                </Paragraph>
-            </ContentBlock>
-        </DesignSectionLayout>
-    );
-}
-
-/* -------------------------------------------------------------------------- */
-/* 07 Realtime                                                                */
-
-/* -------------------------------------------------------------------------- */
-
-function RealtimeSection() {
-    return (
-        <DesignSectionLayout
-            number="07"
-            category="실시간 상태"
-            title="작업 상태는 WebSocket으로 전달하고 DB를 Source of Truth로 유지했습니다."
-            description={
-                <>
-                    비동기 작업의 상태 변경은 WebSocket으로 실시간 전달하되,
-                    연결 끊김이나 메시지 유실 이후에도 복구할 수 있도록
-                    실제 상태는 DB에 저장하고 REST로 다시 조회할 수 있게
-                    구성했습니다.
-                </>
-            }
-            technologies={[
-                "WebSocket",
-                "STOMP",
-                "AFTER_COMMIT",
-                "REST Recovery",
-            ]}
-        >
-            <ContentBlock
-                step="01"
-                label="문제 정의"
-                tone="problem"
-                title="HTTP 요청 종료 이후에도 사용자에게 작업 상태를 전달해야 했습니다."
-            >
-                <Paragraph>
-                    일정 생성이 비동기로 분리되면 HTTP 요청이 끝난 이후에도
-                    후보 수집과 일정 생성 작업이 계속 진행됩니다.
-                </Paragraph>
-            </ContentBlock>
-
-            <ContentBlock
-                step="02"
-                label="전달 설계"
-                tone="analysis"
-                title="Commit 이후 상태 변경을 WebSocket으로 전달합니다."
-            >
-                <FlowPanel
-                    label="Realtime Flow"
-                    tone="analysis"
-                >
-                    <FlowDiagram
-                        items={[
-                            "상태 변경",
-                            "DB Commit",
-                            "Domain Event",
-                            "Realtime",
-                            "WebSocket",
-                            "Client",
-                        ]}
-                    />
-                </FlowPanel>
-            </ContentBlock>
-
-            <ContentBlock
-                step="03"
-                label="최종 구조"
-                tone="decision"
-                title="WebSocket이 아니라 DB를 실제 상태의 기준으로 유지했습니다."
-                last
-            >
-                <Callout tone="decision">
-                    WebSocket 연결은 언제든 끊어질 수 있고 특정 메시지를
-                    놓칠 수도 있습니다. 따라서 WebSocket은 전달 수단으로
-                    사용하고 실제 상태는 DB를 Source of Truth로 유지하며
-                    REST 재조회로 복구할 수 있게 했습니다.
-                </Callout>
-            </ContentBlock>
-        </DesignSectionLayout>
-    );
-}
-
-/* -------------------------------------------------------------------------- */
-/* 08 Monitoring                                                              */
-
-/* -------------------------------------------------------------------------- */
-
-function MonitoringSection() {
-    return (
-        <DesignSectionLayout
-            number="08"
-            category="모니터링"
-            title="비동기 처리와 CDC 상태를 Metric으로 관찰하도록 구성했습니다."
-            description={
-                <>
-                    Worker, Generation, RabbitMQ, CDC 상태를 Metric으로
-                    노출하고 Prometheus와 Grafana를 통해 장애 실험에서
-                    시스템 내부 상태를 확인할 수 있도록 구성했습니다.
-                </>
-            }
-            technologies={[
-                "Prometheus",
-                "Grafana",
-                "Micrometer",
-                "RabbitMQ Metrics",
-            ]}
-        >
-            <ContentBlock
-                step="01"
-                label="관찰 설계"
-                tone="analysis"
-                title="애플리케이션뿐 아니라 Worker, Broker, CDC까지 관찰 대상으로 두었습니다."
-            >
-                <div className="grid gap-3 sm:grid-cols-2">
-                    <MetricCard
-                        title="Worker"
-                        items={[
-                            "처리 횟수",
-                            "처리 시간",
-                            "Retry",
-                            "Failure",
-                        ]}
-                    />
-
-                    <MetricCard
-                        title="Generation"
-                        items={[
-                            "상태별 개수",
-                            "FAILED",
-                            "Stale",
-                        ]}
-                    />
-
-                    <MetricCard
-                        title="RabbitMQ"
-                        items={[
-                            "Ready",
-                            "Unacked",
-                            "Redelivery",
-                            "DLQ",
-                        ]}
-                    />
-
-                    <MetricCard
-                        title="CDC"
-                        items={[
-                            "Connector",
-                            "Offset",
-                            "Lag",
-                            "WAL",
-                        ]}
-                    />
-                </div>
-            </ContentBlock>
-
-            <ContentBlock
-                step="02"
-                label="운영 관점"
-                tone="tradeoff"
-                title="대시보드 자체보다 장애 상황을 설명할 수 있는 지표에 초점을 맞췄습니다."
-                last
-            >
-                <Callout tone="tradeoff">
-                    Debezium 중단, RabbitMQ 장애, Worker ACK 실패를 주입했을 때
-                    단순 성공/실패 로그만 보는 것이 아니라 CDC, Broker,
-                    Consumer 각각의 상태를 확인할 수 있도록 관찰 지점을
-                    정의했습니다.
-                </Callout>
-            </ContentBlock>
-        </DesignSectionLayout>
-    );
-}
-
-/* -------------------------------------------------------------------------- */
-/* Common Components                                                          */
-
-/* -------------------------------------------------------------------------- */
-
-interface DesignSectionLayoutProps {
-    number: string;
-    category: string;
-    title: string;
-    description: ReactNode;
-    technologies: readonly string[];
-    children: ReactNode;
-}
-
-function DesignSectionLayout({
-                                 number,
-                                 category,
-                                 title,
-                                 description,
-                                 technologies,
-                                 children,
-                             }: DesignSectionLayoutProps) {
-    return (
-        <article>
-            <header className="pb-10">
-                <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-foreground">
-                        {number}
-                    </span>
-
-                    <span className="text-sm text-muted-foreground">
-                        ·
-                    </span>
-
-                    <span className="text-sm font-semibold text-muted-foreground">
-                        {category}
-                    </span>
-                </div>
-
-                <h2
-                    className="
-                        mt-4 max-w-[920px]
+                        mx-auto mt-7
+                        max-w-[800px]
                         break-keep
-                        text-3xl font-bold
-                        leading-[1.3] tracking-tighter
-                        sm:text-4xl
+                        border-t border-border/70
+                        pt-6
+                        text-sm leading-8
+                        text-muted-foreground
+                        sm:text-base
                     "
                 >
-                    {title}
-                </h2>
+                    실제 장소 후보를 기반으로 검증 가능한 AI 여행 일정을
+                    생성하는 서비스입니다. 사용자 조건에 따라 장소 후보를
+                    수집하고 AI 생성 결과를 서버에서 검증해 일정으로 저장합니다.
+                </p>
+            </div>
+
+            {/* Project Preview + Summary */}
+            <div
+                className="
+                    mt-12 grid gap-6
+                    lg:grid-cols-[1.08fr_0.92fr]
+                    lg:items-stretch
+                "
+            >
+                <ProjectPreview/>
+
+                <ProjectSummary/>
+            </div>
+        </section>
+    );
+}
+
+function FocusDivider() {
+    return (
+        <>
+            {/* Desktop */}
+            <span
+                className="
+                    hidden
+                    text-lg
+                    font-light
+                    text-muted-foreground/30
+                    sm:inline
+                "
+            >
+                /
+            </span>
+
+            {/* Mobile */}
+            <span
+                className="
+                    block
+                    h-1 w-1
+                    rounded-full
+                    bg-muted-foreground/30
+                    sm:hidden
+                "
+            />
+        </>
+    );
+}
+
+function ProjectPreview() {
+    const preview = (
+        <div
+            className="
+                group relative
+                h-full
+                overflow-hidden
+                rounded-[28px]
+                border border-border
+                bg-[#F7F8FA]
+                p-4
+                shadow-[0_18px_60px_rgba(15,23,42,0.08)]
+                dark:bg-muted/20
+            "
+        >
+            <div
+                className="
+                    relative
+                    aspect-[16/11]
+                    h-full
+                    min-h-[400px]
+                    overflow-hidden
+                    rounded-[20px]
+                    border border-border
+                    bg-background
+                "
+            >
+                <Image
+                    src="/planmate.png"
+                    alt="PlanMate 서비스 화면"
+                    fill
+                    priority
+                    sizes="(max-width: 1024px) 100vw, 55vw"
+                    className="
+                        object-cover object-top
+                        transition-transform
+                        duration-500
+                        group-hover:scale-[1.012]
+                    "
+                />
 
                 <div
                     className="
-                        mt-6 max-w-[840px]
-                        break-keep
-                        text-base leading-8
-                        text-foreground/70
-                        sm:text-lg
+                        absolute inset-x-0 bottom-0
+                        bg-gradient-to-t
+                        from-black/65
+                        via-black/20
+                        to-transparent
+                        px-5 pb-5 pt-24
                     "
                 >
-                    {description}
-                </div>
+                    <div
+                        className="
+                            flex items-end
+                            justify-between gap-4
+                        "
+                    >
+                        <div>
+                            <p className="text-sm font-semibold text-white">
+                                PlanMate
+                            </p>
 
-                <div className="mt-5 flex flex-wrap gap-1.5">
-                    {technologies.map((technology) => (
-                        <Badge
-                            key={technology}
-                            variant="outline"
+                            <p className="mt-1 text-xs text-white/70">
+                                AI 기반 여행 일정 생성 서비스
+                            </p>
+                        </div>
+
+                        <span
                             className="
-                                rounded-md
-                                border-border
-                                bg-background
-                                px-2 py-0.5
-                                text-[10px]
-                                font-medium
-                                text-foreground/80
+                                inline-flex items-center
+                                gap-1.5
+                                rounded-full
+                                bg-white/90
+                                px-3 py-1.5
+                                text-[11px] font-semibold
+                                text-black
+                                backdrop-blur
                             "
                         >
-                            {technology}
-                        </Badge>
-                    ))}
-                </div>
-            </header>
+                            {PROJECT_DEPLOY_URL
+                                ? "서비스 보기"
+                                : "배포 후 연결 예정"}
 
-            <div className="border-t border-border pt-10">
-                <div className="space-y-16">
-                    {children}
+                            <ArrowUpRight className="size-3"/>
+                        </span>
+                    </div>
                 </div>
             </div>
-        </article>
+        </div>
+    );
+
+    if (!PROJECT_DEPLOY_URL) {
+        return preview;
+    }
+
+    return (
+        <Link
+            href={PROJECT_DEPLOY_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="PlanMate 서비스 열기"
+        >
+            {preview}
+        </Link>
     );
 }
 
-function ContentBlock({
-                          step,
-                          label,
-                          tone,
-                          title,
-                          children,
-                          last = false,
-                      }: {
-    step: string;
-    label: string;
-    tone: AccentTone;
-    title: string;
-    children: ReactNode;
-    last?: boolean;
-}) {
-    const style = toneStyles[tone];
-
+function ProjectSummary() {
     return (
-        <section className="relative pl-12 sm:pl-14">
-            {!last && (
-                <span
-                    className={[
-                        "absolute left-[15px] top-8 -bottom-16 w-px",
-                        style.rail,
-                    ].join(" ")}
-                />
-            )}
-
-            <span
-                className={[
-                    "absolute left-0 top-0 flex size-8 items-center justify-center rounded-full border text-[10px] font-bold tabular-nums",
-                    style.bg,
-                    style.border,
-                    style.text,
-                ].join(" ")}
+        <div
+            className="
+                flex h-full flex-col
+                rounded-[28px]
+                border border-border
+                bg-background
+                p-6
+                shadow-[0_18px_60px_rgba(15,23,42,0.08)]
+                sm:p-7
+            "
+        >
+            <div
+                className="
+                    flex flex-wrap
+                    gap-x-4 gap-y-2
+                    border-b border-border
+                    pb-5
+                    text-sm
+                "
             >
-                {step}
+                <div>
+                    <span className="font-semibold text-[#41805B]">
+                        기간
+                    </span>
+
+                    <span className="ml-2 font-semibold">
+                        2026 ~ 진행 중
+                    </span>
+                </div>
+
+                <span className="hidden text-muted-foreground/40 sm:block">
+                    |
+                </span>
+
+                <div>
+                    <span className="font-semibold text-[#41805B]">
+                        인원
+                    </span>
+
+                    <span className="ml-2 font-semibold">
+                        1명 (개인)
+                    </span>
+                </div>
+            </div>
+
+            <div className="mt-6">
+                <p className="text-sm font-bold">
+                    핵심 구현
+                </p>
+
+                <div className="mt-4 space-y-2.5">
+                    <HeroCoreItem
+                        number="01"
+                        title="HTTP와 일정 생성 작업 분리"
+                        result="→ generationId 우선 반환 · Worker 실행"
+                    />
+
+                    <HeroCoreItem
+                        number="02"
+                        title="DB ↔ Message 정합성"
+                        result="→ Outbox + Debezium CDC"
+                    />
+
+                    <HeroCoreItem
+                        number="03"
+                        title="재전달 가능한 Worker"
+                        result="→ ACK · 멱등성 · Retry · DLQ"
+                    />
+
+                    <HeroCoreItem
+                        number="04"
+                        title="AI 일정 의미 검증"
+                        result="→ Candidate · 시간 중복 · 활동시간 검증"
+                    />
+                </div>
+            </div>
+
+            <div className="mt-6">
+                <p className="text-sm font-bold">
+                    사용 기술
+                </p>
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                    {technologies.map(
+                        (technology) => (
+                            <TechBadge
+                                key={technology.name}
+                                name={technology.name}
+                                icon={technology.icon}
+                            />
+                        )
+                    )}
+                </div>
+            </div>
+
+            <div
+                className="
+                    mt-auto flex flex-wrap gap-2
+                    pt-7
+                "
+            >
+                <ExternalButton
+                    href="https://github.com/f-lab-edu/plan-mate"
+                    icon={<Github className="size-4"/>}
+                >
+                    프로젝트 링크
+                </ExternalButton>
+
+                <ExternalButton
+                    href="https://velog.io/@bapegg/posts"
+                    icon={<ExternalLink className="size-4"/>}
+                >
+                    개발 기록
+                </ExternalButton>
+            </div>
+        </div>
+    );
+}
+
+function HeroCoreItem({
+                          number,
+                          title,
+                          result,
+                      }: {
+    number: string;
+    title: string;
+    result: string;
+}) {
+    return (
+        <div
+            className="
+                grid gap-3
+                rounded-xl
+                border border-border
+                bg-muted/20
+                px-4 py-3.5
+                sm:grid-cols-[32px_1fr]
+            "
+        >
+            <span
+                className="
+                    pt-0.5
+                    text-sm font-bold
+                    text-[#315FEA]
+                "
+            >
+                {number}
             </span>
 
             <div>
-                <p
-                    className={[
-                        "text-xs font-bold",
-                        style.text,
-                    ].join(" ")}
-                >
-                    {label}
+                <p className="text-sm font-medium">
+                    {title}
                 </p>
 
-                <h3
+                <p
                     className="
-                        mt-1 max-w-[900px]
-                        break-keep
-                        text-xl font-semibold
-                        leading-8 tracking-tight
+                        mt-1
+                        text-xs font-semibold
+                        text-[#D5574F]
+                        dark:text-[#E4939A]
                     "
                 >
-                    {title}
-                </h3>
+                    {result}
+                </p>
+            </div>
+        </div>
+    );
+}
 
-                <div className="mt-5 space-y-4">
-                    {children}
+/* -------------------------------------------------------------------------- */
+/* Navigation                                                                 */
+
+/* -------------------------------------------------------------------------- */
+
+function ProjectNavigation() {
+    return (
+        <div
+            className="
+                sticky top-4 z-30
+                mx-auto my-20
+                flex w-fit
+                max-w-full
+                overflow-x-auto
+                rounded-2xl
+                border border-border
+                bg-background/90
+                p-1.5
+                shadow-lg
+                backdrop-blur
+            "
+        >
+            <NavigationLink href="#core">
+                핵심 사항
+            </NavigationLink>
+
+            <NavigationLink href="#troubleshooting">
+                트러블슈팅
+            </NavigationLink>
+
+            <NavigationLink href="#failure-test">
+                장애 주입 테스트
+            </NavigationLink>
+        </div>
+    );
+}
+
+function NavigationLink({
+                            href,
+                            children,
+                        }: {
+    href: string;
+    children: ReactNode;
+}) {
+    return (
+        <a
+            href={href}
+            className="
+                shrink-0
+                rounded-xl
+                px-4 py-2.5
+                text-xs font-semibold
+                text-muted-foreground
+                transition-colors
+                hover:bg-muted
+                hover:text-foreground
+            "
+        >
+            {children}
+        </a>
+    );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Core                                                                       */
+
+/* -------------------------------------------------------------------------- */
+
+function CoreSection() {
+    return (
+        <section
+            id="core"
+            className="scroll-mt-28"
+        >
+            <SectionHeader
+                eyebrow="FEATURED PROJECTS"
+                title="프로젝트 핵심 사항"
+                description="프로젝트 안에서 어떤 문제가 있었고 이를 어떤 방식으로 해결했는지 중요한 사례만 정리했습니다."
+            />
+
+            <AccordionGuide/>
+
+            <Accordion
+                type="single"
+                collapsible
+                defaultValue="core-01"
+                className="mt-5 space-y-5"
+            >
+                {coreFeatures.map(
+                    (feature) => (
+                        <CoreAccordionItem
+                            key={feature.number}
+                            feature={feature}
+                        />
+                    )
+                )}
+            </Accordion>
+        </section>
+    );
+}
+
+function CoreAccordionItem({
+                               feature,
+                           }: {
+    feature: CoreFeature;
+}) {
+    return (
+        <AccordionItem
+            value={`core-${feature.number}`}
+            className="
+                overflow-hidden
+                rounded-[26px]
+                border border-border
+                bg-background
+                shadow-[0_12px_40px_rgba(15,23,42,0.05)]
+                transition-all
+                duration-200
+                hover:border-[#B9C9F5]
+                hover:shadow-[0_16px_48px_rgba(15,23,42,0.08)]
+                data-[state=open]:border-[#AFC2F5]
+            "
+        >
+            <AccordionTrigger
+                className="
+                    group
+                    cursor-pointer
+                    px-5 py-6
+                    hover:no-underline
+                    hover:bg-muted/15
+                    sm:px-7
+                    [&>svg]:hidden
+                "
+            >
+                <AccordionHeader
+                    number={feature.number}
+                    numberColor="text-[#315FEA]"
+                    title={feature.title}
+                    summary={feature.summary}
+                    technologies={feature.technologies}
+                    status={feature.status}
+                />
+            </AccordionTrigger>
+
+            <AccordionContent
+                className="
+                    px-5 pb-7 pt-0
+                    sm:px-7
+                "
+            >
+                <div
+                    className="
+                        space-y-4
+                        border-t border-border
+                        pt-6
+                    "
+                >
+                    <StarSection
+                        type="situation"
+                        english="SITUATION"
+                        title="상황"
+                    >
+                        {feature.situation}
+                    </StarSection>
+
+                    <StarSection
+                        type="task"
+                        english="TASK"
+                        title="과제"
+                    >
+                        {feature.task}
+                    </StarSection>
+
+                    <StarSection
+                        type="action"
+                        english="ACTION"
+                        title="실행"
+                    >
+                        {feature.action}
+                    </StarSection>
+
+                    <StarSection
+                        type="result"
+                        english="RESULT"
+                        title="결과"
+                    >
+                        {feature.result}
+                    </StarSection>
+                </div>
+            </AccordionContent>
+        </AccordionItem>
+    );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Troubleshooting                                                            */
+
+/* -------------------------------------------------------------------------- */
+
+function TroubleshootingSection() {
+    return (
+        <section
+            id="troubleshooting"
+            className="scroll-mt-28"
+        >
+            <SectionHeader
+                eyebrow="TROUBLE SHOOTING"
+                title="트러블슈팅"
+                description="개발 과정에서 실제로 해결했거나 비동기 구조로 전환하면서 새롭게 다뤄야 했던 실패 조건을 정리했습니다."
+            />
+
+            <AccordionGuide/>
+
+            <Accordion
+                type="single"
+                collapsible
+                className="mt-5 space-y-5"
+            >
+                {troubleshootingItems.map(
+                    (item) => (
+                        <TroubleshootingAccordionItem
+                            key={item.number}
+                            item={item}
+                        />
+                    )
+                )}
+            </Accordion>
+        </section>
+    );
+}
+
+function TroubleshootingAccordionItem({
+                                          item,
+                                      }: {
+    item: TroubleshootingItem;
+}) {
+    return (
+        <AccordionItem
+            value={`trouble-${item.number}`}
+            className="
+                overflow-hidden
+                rounded-[26px]
+                border border-border
+                bg-background
+                shadow-[0_12px_40px_rgba(15,23,42,0.05)]
+                transition-all
+                duration-200
+                hover:border-[#F0B7B9]
+                hover:shadow-[0_16px_48px_rgba(15,23,42,0.08)]
+                data-[state=open]:border-[#E8A8AC]
+            "
+        >
+            <AccordionTrigger
+                className="
+                    group
+                    cursor-pointer
+                    px-5 py-6
+                    hover:no-underline
+                    hover:bg-muted/15
+                    sm:px-7
+                    [&>svg]:hidden
+                "
+            >
+                <AccordionHeader
+                    number={item.number}
+                    numberColor="text-[#D5574F]"
+                    title={item.title}
+                    summary={item.summary}
+                    technologies={item.technologies}
+                    status={item.status}
+                />
+            </AccordionTrigger>
+
+            <AccordionContent
+                className="
+                    px-5 pb-7 pt-0
+                    sm:px-7
+                "
+            >
+                <div
+                    className="
+                        space-y-4
+                        border-t border-border
+                        pt-6
+                    "
+                >
+                    {item.content}
+                </div>
+            </AccordionContent>
+        </AccordionItem>
+    );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Failure Injection                                                          */
+
+/* -------------------------------------------------------------------------- */
+
+function FailureInjectionSection() {
+    return (
+        <section
+            id="failure-test"
+            className="scroll-mt-28"
+        >
+            <SectionHeader
+                eyebrow="RELIABILITY TEST"
+                title="장애 주입 테스트"
+                description="각 구성요소를 의도적으로 중단해 예상한 복구 경로가 실제로 동작하는지 검증합니다."
+                badge="검증 예정"
+            />
+
+            <div
+                className="
+                    mt-7
+                    rounded-[20px]
+                    border border-[#E4D39E]
+                    bg-[#FFFCF4]
+                    p-5
+                    dark:border-[#5F5636]
+                    dark:bg-[#292419]
+                "
+            >
+                <div className="flex gap-3">
+                    <FlaskConical
+                        className="
+                            mt-1 size-5 shrink-0
+                            text-[#9B7C29]
+                        "
+                    />
+
+                    <p
+                        className="
+                            break-keep
+                            text-sm leading-7
+                            text-muted-foreground
+                        "
+                    >
+                        각 실험은
+                        <Strong>
+                            {" "}장애 시뮬레이션 → 예상 문제 →
+                            대안·해결방안 → 판정 기준 →
+                            실제 결과 → 결론
+                        </Strong>
+                        순서로 기록합니다.
+                    </p>
+                </div>
+            </div>
+
+            <AccordionGuide/>
+
+            <Accordion
+                type="single"
+                collapsible
+                className="mt-5 space-y-5"
+            >
+                {failureExperiments.map(
+                    (experiment) => (
+                        <FailureAccordionItem
+                            key={experiment.number}
+                            experiment={experiment}
+                        />
+                    )
+                )}
+            </Accordion>
+        </section>
+    );
+}
+
+function FailureAccordionItem({
+                                  experiment,
+                              }: {
+    experiment: FailureExperiment;
+}) {
+    return (
+        <AccordionItem
+            value={`failure-${experiment.number}`}
+            className="
+                overflow-hidden
+                rounded-[26px]
+                border border-border
+                bg-background
+                shadow-[0_12px_40px_rgba(15,23,42,0.05)]
+                transition-all
+                duration-200
+                hover:border-[#E2D19A]
+                hover:shadow-[0_16px_48px_rgba(15,23,42,0.08)]
+                data-[state=open]:border-[#D4BD73]
+            "
+        >
+            <AccordionTrigger
+                className="
+                    group
+                    cursor-pointer
+                    px-5 py-6
+                    hover:no-underline
+                    hover:bg-muted/15
+                    sm:px-7
+                    [&>svg]:hidden
+                "
+            >
+                <AccordionHeader
+                    number={experiment.number}
+                    numberColor="text-[#A17C20]"
+                    title={experiment.title}
+                    summary={experiment.summary}
+                    technologies={experiment.technologies}
+                    status="planned"
+                />
+            </AccordionTrigger>
+
+            <AccordionContent
+                className="
+                    px-5 pb-7 pt-0
+                    sm:px-7
+                "
+            >
+                <div
+                    className="
+                        space-y-4
+                        border-t border-border
+                        pt-6
+                    "
+                >
+                    <FailureSection
+                        type="simulation"
+                        english="FAILURE SIMULATION"
+                        title="장애 시뮬레이션"
+                    >
+                        {experiment.simulation}
+                    </FailureSection>
+
+                    <FailureSection
+                        type="problem"
+                        english="PROBLEM"
+                        title="예상 문제"
+                    >
+                        {experiment.problem}
+                    </FailureSection>
+
+                    <FailureSection
+                        type="action"
+                        english="ACTION"
+                        title="대안 · 해결 방안"
+                    >
+                        {experiment.action}
+                    </FailureSection>
+
+                    <FailureSection
+                        type="result"
+                        english="RESULT"
+                        title="판정 기준"
+                    >
+                        {experiment.criteria}
+
+                        <div
+                            className="
+                                mt-5 grid gap-3
+                                sm:grid-cols-2
+                            "
+                        >
+                            <PendingResult
+                                title="실제 결과"
+                                description="장애 주입 후 Metric, 로그, DB 상태를 작성합니다."
+                            />
+
+                            <PendingResult
+                                title="결론"
+                                description="예상과 실제 차이 및 설계 수정 내용을 작성합니다."
+                            />
+                        </div>
+                    </FailureSection>
+                </div>
+            </AccordionContent>
+        </AccordionItem>
+    );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Additional                                                                 */
+
+/* -------------------------------------------------------------------------- */
+
+function AdditionalDesignSection() {
+    return (
+        <section>
+            <SectionHeader
+                eyebrow="ADDITIONAL DESIGN"
+                title="추가 설계"
+                description="일정 생성 파이프라인 이외의 구현은 핵심 내용만 간결하게 정리했습니다."
+            />
+
+            <div
+                className="
+                    mt-8 grid gap-4
+                    md:grid-cols-2
+                "
+            >
+                <AdditionalCard
+                    icon={<Database className="size-5"/>}
+                    title="Input / Candidate Snapshot"
+                    description="Generation 생성 당시의 입력과 Worker가 실제 사용한 후보를 보존해 이후 데이터 변경과 과거 실행을 분리했습니다."
+                    tags={[
+                        "InputSnapshot",
+                        "CandidateSnapshot",
+                    ]}
+                />
+
+                <AdditionalCard
+                    icon={<Radio className="size-5"/>}
+                    title="실시간 상태 전달"
+                    description="상태 변경은 DB Commit 이후 WebSocket으로 전달하고 Push 실패 시 REST로 DB 상태를 다시 조회합니다."
+                    tags={[
+                        "WebSocket",
+                        "STOMP",
+                        "REST Recovery",
+                    ]}
+                />
+
+                <AdditionalCard
+                    icon={<Activity className="size-5"/>}
+                    title="Observability"
+                    description="Worker 처리량, Retry, 처리시간, Generation 상태를 Metric으로 노출해 비동기 내부 상태를 관찰합니다."
+                    tags={[
+                        "Prometheus",
+                        "Grafana",
+                    ]}
+                />
+
+                <AdditionalCard
+                    icon={<KeyRound className="size-5"/>}
+                    title="Authentication"
+                    description="Local/OAuth2 인증을 하나의 사용자 모델로 연결하고 JWT와 Redis 기반 Refresh Session을 사용했습니다."
+                    tags={[
+                        "Spring Security",
+                        "JWT",
+                        "Redis",
+                    ]}
+                />
+            </div>
+        </section>
+    );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Retrospective                                                              */
+
+/* -------------------------------------------------------------------------- */
+
+function RetrospectiveSection() {
+    return (
+        <section>
+            <SectionHeader
+                eyebrow="RETROSPECTIVE"
+                title="왜 RabbitMQ와 Debezium까지 사용했는가"
+            />
+
+            <div
+                className="
+                    mt-8
+                    rounded-[24px]
+                    border border-border
+                    bg-muted/20
+                    p-6
+                    sm:p-8
+                "
+            >
+                <p
+                    className="
+                        max-w-[860px]
+                        break-keep
+                        text-sm leading-8
+                        text-muted-foreground
+                        sm:text-base
+                    "
+                >
+                    현재 PlanMate의 규모만 보면
+                    RabbitMQ와 Debezium이 반드시 필요한 것은 아닙니다.
+                    단순히 오래 걸리는 작업을 HTTP 요청에서 분리하는 것이
+                    목적이라면 @Async나 DB Polling Worker도
+                    충분히 고려할 수 있습니다.
+                </p>
+
+                <p
+                    className="
+                        mt-5
+                        max-w-[860px]
+                        break-keep
+                        text-sm leading-8
+                        text-muted-foreground
+                        sm:text-base
+                    "
+                >
+                    이 프로젝트에서는
+                    <Strong>
+                        {" "}ACK, Redelivery, Retry, DLQ,
+                        Transactional Outbox, CDC,
+                        Consumer 멱등성과 장애 복구
+                    </Strong>
+                    를 직접 설계하고
+                    장애를 주입해 확인하는 것까지
+                    학습 범위에 포함했습니다.
+                </p>
+
+                <div className="mt-7 flex flex-wrap gap-2">
+                    {[
+                        "ACK",
+                        "Redelivery",
+                        "Retry",
+                        "DLQ",
+                        "Outbox",
+                        "CDC",
+                        "Idempotency",
+                        "Failure Recovery",
+                    ].map((item) => (
+                        <TechnologyPill key={item}>
+                            {item}
+                        </TechnologyPill>
+                    ))}
                 </div>
             </div>
         </section>
     );
 }
 
-function SectionEyebrow({
-                            children,
-                        }: {
-    children: ReactNode;
-}) {
+/* -------------------------------------------------------------------------- */
+/* Accordion Common                                                           */
+
+/* -------------------------------------------------------------------------- */
+
+function AccordionGuide() {
     return (
-        <p
+        <div
             className="
-                text-xs font-bold
-                tracking-[0.08em]
+                mt-7
+                flex items-center gap-2
+                text-xs
                 text-muted-foreground
             "
         >
+            <span
+                className="
+                    flex size-6
+                    items-center justify-center
+                    rounded-full
+                    border border-border
+                    bg-background
+                "
+            >
+                <ChevronDown className="size-3.5"/>
+            </span>
+
+            <span>
+                각 항목을 클릭하면 상세 내용을 확인할 수 있습니다.
+            </span>
+        </div>
+    );
+}
+
+function AccordionHeader({
+                             number,
+                             numberColor,
+                             title,
+                             summary,
+                             technologies,
+                             status,
+                         }: {
+    number: string;
+    numberColor: string;
+    title: string;
+    summary: string;
+    technologies: readonly string[];
+    status: StatusType;
+}) {
+    return (
+        <div
+            className="
+                flex min-w-0
+                flex-1 items-start
+                gap-4 pr-1
+            "
+        >
+            <div
+                className="
+                    min-w-0
+                    flex-1 text-left
+                "
+            >
+                <span
+                    className={`
+                        text-sm font-bold
+                        tabular-nums
+                        ${numberColor}
+                    `}
+                >
+                    {number}
+                </span>
+
+                <div
+                    className="
+                        mt-2
+                        flex flex-col gap-4
+                        xl:flex-row
+                        xl:items-start
+                        xl:justify-between
+                    "
+                >
+                    <div className="min-w-0 max-w-[640px]">
+                        <div
+                            className="
+                                flex flex-wrap
+                                items-center gap-2
+                            "
+                        >
+                            <h3
+                                className="
+                                    break-keep
+                                    text-xl font-bold
+                                    leading-[1.45]
+                                "
+                            >
+                                {title}
+                            </h3>
+
+                            <StatusBadge status={status}/>
+                        </div>
+
+                        <p
+                            className="
+                                mt-2
+                                break-keep
+                                text-sm leading-7
+                                text-muted-foreground
+                            "
+                        >
+                            {summary}
+                        </p>
+                    </div>
+
+                    <div
+                        className="
+                            flex shrink-0
+                            flex-col
+                            items-start gap-3
+                            xl:items-end
+                        "
+                    >
+                        <div className="flex flex-wrap gap-2 xl:justify-end">
+                            {technologies.map(
+                                (technology) => (
+                                    <TechnologyPill
+                                        key={technology}
+                                    >
+                                        {technology}
+                                    </TechnologyPill>
+                                )
+                            )}
+                        </div>
+
+                        <DisclosureHint/>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function DisclosureHint() {
+    return (
+        <span
+            className="
+                inline-flex h-9
+                shrink-0
+                items-center gap-2
+                rounded-full
+                border border-border
+                bg-background
+                px-3.5
+                text-[11px] font-semibold
+                text-muted-foreground
+                shadow-sm
+                transition-all
+                group-hover:border-[#AFC2F5]
+                group-hover:text-foreground
+                group-hover:shadow-md
+            "
+        >
+            <span className="group-data-[state=open]:hidden">
+                상세 보기
+            </span>
+
+            <span
+                className="
+                    hidden
+                    group-data-[state=open]:inline
+                "
+            >
+                접기
+            </span>
+
+            <ChevronDown
+                className="
+                    size-3.5
+                    transition-transform
+                    duration-200
+                    group-data-[state=open]:rotate-180
+                "
+            />
+        </span>
+    );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Common                                                                     */
+
+/* -------------------------------------------------------------------------- */
+
+function SectionHeader({
+                           eyebrow,
+                           title,
+                           description,
+                           badge,
+                       }: {
+    eyebrow: string;
+    title: string;
+    description?: string;
+    badge?: string;
+}) {
+    return (
+        <div>
+            <div className="flex items-center gap-3">
+                <span
+                    className="
+                        inline-flex
+                        rounded-full
+                        border border-[#D7E1FF]
+                        bg-white
+                        px-4 py-2
+                        text-[11px] font-semibold
+                        text-[#315FEA]
+                        dark:border-blue-900
+                        dark:bg-background
+                    "
+                >
+                    {eyebrow}
+                </span>
+
+                {badge && (
+                    <span
+                        className="
+                            rounded-full
+                            border border-[#E1D19F]
+                            bg-[#FAF6EA]
+                            px-2.5 py-1
+                            text-[9px] font-bold
+                            text-[#9B7C29]
+                            dark:border-[#5F5636]
+                            dark:bg-[#292419]
+                        "
+                    >
+                        {badge}
+                    </span>
+                )}
+            </div>
+
+            <h2
+                className="
+                    mt-5
+                    text-2xl font-bold
+                    tracking-[-0.03em]
+                    sm:text-3xl
+                "
+            >
+                {title}
+            </h2>
+
+            {description && (
+                <p
+                    className="
+                        mt-4
+                        max-w-[820px]
+                        break-keep
+                        text-sm leading-7
+                        text-muted-foreground
+                    "
+                >
+                    {description}
+                </p>
+            )}
+        </div>
+    );
+}
+
+function StarSection({
+                         type,
+                         english,
+                         title,
+                         children,
+                     }: {
+    type: StarType;
+    english: string;
+    title: string;
+    children: ReactNode;
+}) {
+    const styles = {
+        situation: {
+            border:
+                "border-[#FFB8BC] dark:border-[#633D42]",
+
+            background:
+                "bg-[#FFF9F9] dark:bg-[#2C1E20]/40",
+
+            text:
+                "text-[#E33D48] dark:text-[#E4939A]",
+        },
+
+        task: {
+            border:
+                "border-[#EDCB73] dark:border-[#5F5636]",
+
+            background:
+                "bg-[#FFFCF5] dark:bg-[#292419]/40",
+
+            text:
+                "text-[#C67A11] dark:text-[#D9BC72]",
+        },
+
+        action: {
+            border:
+                "border-[#A8CAFF] dark:border-[#3E4C69]",
+
+            background:
+                "bg-[#F8FBFF] dark:bg-[#1B2230]/40",
+
+            text:
+                "text-[#3572F4] dark:text-[#91A9D7]",
+        },
+
+        result: {
+            border:
+                "border-[#9FE1C2] dark:border-[#3C5C49]",
+
+            background:
+                "bg-[#F7FDF9] dark:bg-[#19251E]/40",
+
+            text:
+                "text-[#159A69] dark:text-[#83B497]",
+        },
+    };
+
+    const style = styles[type];
+
+    return (
+        <section
+            className={`
+                rounded-[24px]
+                border
+                px-5 py-5
+                sm:px-6 sm:py-6
+                ${style.border}
+                ${style.background}
+            `}
+        >
+            <div className="flex items-center gap-4">
+                <span
+                    className={`
+                        text-[11px] font-bold
+                        tracking-[0.08em]
+                        ${style.text}
+                    `}
+                >
+                    {english}
+                </span>
+
+                <h4 className="text-base font-bold">
+                    {title}
+                </h4>
+            </div>
+
+            <div className="mt-4 space-y-4">
+                {children}
+            </div>
+        </section>
+    );
+}
+
+function TroubleSection({
+                            type,
+                            english,
+                            title,
+                            children,
+                        }: {
+    type:
+        | "situation"
+        | "action"
+        | "result";
+
+    english: string;
+    title: string;
+    children: ReactNode;
+}) {
+    const mappedType: StarType =
+        type === "situation"
+            ? "situation"
+            : type === "action"
+                ? "action"
+                : "result";
+
+    return (
+        <StarSection
+            type={mappedType}
+            english={english}
+            title={title}
+        >
             {children}
-        </p>
+        </StarSection>
+    );
+}
+
+function FailureSection({
+                            type,
+                            english,
+                            title,
+                            children,
+                        }: {
+    type:
+        | "simulation"
+        | "problem"
+        | "action"
+        | "result";
+
+    english: string;
+    title: string;
+    children: ReactNode;
+}) {
+    const mappedType: StarType =
+        type === "simulation" ||
+        type === "problem"
+            ? "situation"
+            : type === "action"
+                ? "action"
+                : "result";
+
+    return (
+        <StarSection
+            type={mappedType}
+            english={english}
+            title={title}
+        >
+            {children}
+        </StarSection>
     );
 }
 
@@ -2255,11 +2827,9 @@ function Paragraph({
     return (
         <p
             className="
-                max-w-[780px]
                 break-keep
                 text-sm leading-7
                 text-muted-foreground
-                sm:text-base sm:leading-8
             "
         >
             {children}
@@ -2279,897 +2849,455 @@ function Strong({
     );
 }
 
-/* -------------------------------------------------------------------------- */
-/* Overview Cards                                                             */
-
-/* -------------------------------------------------------------------------- */
-
-function CoreDecisionCard({
-                              decision,
-                              onClick,
-                          }: {
-    decision: CoreDecision;
-    onClick: () => void;
+function BulletList({
+                        items,
+                    }: {
+    items: readonly string[];
 }) {
     return (
-        <button
-            type="button"
-            onClick={onClick}
+        <ul className="space-y-2.5">
+            {items.map((item) => (
+                <li
+                    key={item}
+                    className="
+                        flex gap-2.5
+                        text-sm leading-7
+                        text-muted-foreground
+                    "
+                >
+                    <CircleDot
+                        className="
+                            mt-[0.45rem]
+                            size-3 shrink-0
+                            text-muted-foreground/50
+                        "
+                    />
+
+                    <span>{item}</span>
+                </li>
+            ))}
+        </ul>
+    );
+}
+
+function SimpleFlow({
+                        items,
+                        danger = false,
+                    }: {
+    items: readonly string[];
+    danger?: boolean;
+}) {
+    return (
+        <div
             className="
-                group relative
-                w-full overflow-hidden
-                rounded-xl
-                border border-border
-                bg-background
-                p-5 text-left
-                transition-all duration-200
-                hover:-translate-y-[1px]
-                hover:border-foreground/25
-                hover:shadow-sm
+                mt-5
+                flex flex-col gap-2
+                xl:flex-row
+                xl:items-center
             "
         >
-            <span
+            {items.map((item, index) => (
+                <div
+                    key={`${item}-${index}`}
+                    className="
+                        flex flex-1
+                        flex-col gap-2
+                        xl:flex-row
+                        xl:items-center
+                    "
+                >
+                    <div
+                        className={`
+                            flex min-h-11
+                            flex-1
+                            items-center justify-center
+                            rounded-lg
+                            border
+                            px-2.5 py-2
+                            text-center
+                            text-[11px] font-semibold
+                            ${
+                            danger
+                                ? "border-[#E7C5C8] bg-white/60 dark:border-[#633D42] dark:bg-black/10"
+                                : "border-border bg-background"
+                        }
+                        `}
+                    >
+                        {item}
+                    </div>
+
+                    {index !==
+                        items.length - 1 && (
+                            <ArrowRight
+                                className="
+                                mx-auto
+                                size-3.5
+                                rotate-90
+                                text-muted-foreground/30
+                                xl:rotate-0
+                            "
+                            />
+                        )}
+                </div>
+            ))}
+        </div>
+    );
+}
+
+function DualWriteDiagram() {
+    return (
+        <div
+            className="
+                mt-5
+                grid max-w-[620px]
+                gap-3
+                sm:grid-cols-[1fr_auto_1fr]
+                sm:items-center
+            "
+        >
+            <OutcomeBox
+                title="PostgreSQL"
+                value="Generation COMMIT 성공"
+                success
+            />
+
+            <ArrowRight
                 className="
-                    absolute inset-y-0 left-0
-                    w-[3px]
-                    bg-foreground/70
+                    mx-auto
+                    size-4
+                    rotate-90
+                    text-muted-foreground/30
+                    sm:rotate-0
                 "
             />
 
-            <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
-                <div className="flex min-w-0 flex-1 gap-4">
-                    <div
-                        className="
-                            flex size-11 shrink-0
-                            items-center justify-center
-                            rounded-xl
-                            bg-muted
-                            text-foreground
-                        "
-                    >
-                        {decision.icon}
-                    </div>
-
-                    <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                            <span className="text-xs font-bold tabular-nums text-foreground">
-                                {decision.number}
-                            </span>
-
-                            <span className="text-xs font-medium text-muted-foreground">
-                                · {decision.category}
-                            </span>
-                        </div>
-
-                        <h4
-                            className="
-                                mt-1 max-w-[760px]
-                                break-keep
-                                text-base font-semibold
-                                leading-7
-                                sm:text-lg
-                            "
-                        >
-                            {decision.title}
-                        </h4>
-
-                        <p
-                            className="
-                                mt-2 max-w-[760px]
-                                break-keep
-                                text-xs leading-5
-                                text-muted-foreground
-                                sm:text-sm sm:leading-6
-                            "
-                        >
-                            {decision.description}
-                        </p>
-
-                        <div className="mt-3 flex flex-wrap gap-1.5">
-                            {decision.technologies.map(
-                                (technology) => (
-                                    <Badge
-                                        key={technology}
-                                        variant="outline"
-                                        className="
-                                            h-5
-                                            border-border
-                                            bg-background
-                                            px-2
-                                            text-[9px]
-                                        "
-                                    >
-                                        {technology}
-                                    </Badge>
-                                )
-                            )}
-                        </div>
-                    </div>
-                </div>
-
-                <div
-                    className="
-                        flex shrink-0
-                        items-center gap-1
-                        text-xs font-bold
-                        text-foreground
-                    "
-                >
-                    구현 상세
-
-                    <ArrowRight
-                        className="
-                            size-4
-                            transition-transform
-                            group-hover:translate-x-1
-                        "
-                    />
-                </div>
-            </div>
-        </button>
+            <OutcomeBox
+                title="RabbitMQ"
+                value="Message Publish 실패 가능"
+            />
+        </div>
     );
 }
 
-function SmallDecisionCard({
-                               number,
-                               icon,
-                               title,
-                               description,
-                               technologies,
-                               onClick,
-                           }: {
-    number: string;
-    icon: ReactNode;
-    title: string;
-    description: string;
-    technologies: readonly string[];
-    onClick: () => void;
-}) {
+/* -------------------------------------------------------------------------- */
+/* Compact Schedule Example                                                   */
+
+/* -------------------------------------------------------------------------- */
+
+function ScheduleExample() {
     return (
-        <button
-            type="button"
-            onClick={onClick}
+        <div
             className="
-                group flex h-full flex-col
+                mt-5
+                w-full max-w-[440px]
+                overflow-hidden
                 rounded-xl
                 border border-border
                 bg-background
-                p-5 text-left
-                transition-all duration-200
-                hover:-translate-y-[1px]
-                hover:border-foreground/25
-                hover:shadow-sm
             "
         >
-            <div className="flex items-start justify-between">
-                <div
-                    className="
-                        flex size-10
-                        items-center justify-center
-                        rounded-xl
-                        bg-muted
-                        text-foreground
-                    "
-                >
-                    {icon}
-                </div>
+            <ScheduleRow
+                place="서울숲"
+                time="10:00 - 11:00"
+            />
 
-                <span className="text-xs font-bold text-muted-foreground">
-                    {number}
-                </span>
-            </div>
+            <ScheduleRow
+                place="성수 카페"
+                time="10:30 - 12:00"
+            />
 
-            <h4 className="mt-4 text-base font-semibold">
-                {title}
-            </h4>
-
-            <p
+            <div
                 className="
-                    mt-2 flex-1
-                    break-keep
-                    text-xs leading-5
-                    text-muted-foreground
+                    border-t border-border
+                    bg-[#FBF1F2]
+                    px-4 py-3
+                    text-xs font-semibold
+                    text-[#B84F57]
+                    dark:bg-[#2C1E20]
+                    dark:text-[#E4939A]
                 "
             >
-                {description}
-            </p>
-
-            <div className="mt-4 flex flex-wrap gap-1">
-                {technologies.map((technology) => (
-                    <Badge
-                        key={technology}
-                        variant="outline"
-                        className="
-                            h-5 px-1.5
-                            text-[9px]
-                            font-normal
-                        "
-                    >
-                        {technology}
-                    </Badge>
-                ))}
+                시간 중복 → 실제 일정으로 사용 불가
             </div>
-
-            <span
-                className="
-                    mt-5 flex items-center gap-1
-                    text-xs font-bold
-                    text-foreground
-                "
-            >
-                구현 상세
-
-                <ArrowRight
-                    className="
-                        size-3.5
-                        transition-transform
-                        group-hover:translate-x-1
-                    "
-                />
-            </span>
-        </button>
+        </div>
     );
 }
 
-/* -------------------------------------------------------------------------- */
-/* Semantic Components                                                        */
-
-/* -------------------------------------------------------------------------- */
-
-function FlowPanel({
-                       label,
-                       tone,
-                       children,
-                   }: {
-    label: string;
-    tone: AccentTone;
-    children: ReactNode;
+function ScheduleRow({
+                         place,
+                         time,
+                     }: {
+    place: string;
+    time: string;
 }) {
-    const style = toneStyles[tone];
-
     return (
         <div
-            className={[
-                "mt-5 rounded-xl border p-5",
-                style.bg,
-                style.border,
-            ].join(" ")}
+            className="
+                grid
+                grid-cols-[minmax(100px,150px)_110px]
+                items-center
+                justify-start
+                gap-5
+                border-b border-border
+                px-4 py-3
+                last:border-b-0
+            "
         >
-            <div className="mb-4 flex items-center gap-3">
-                <span
-                    className={[
-                        "text-[10px] font-bold uppercase tracking-[0.16em]",
-                        style.text,
-                    ].join(" ")}
-                >
-                    {label}
-                </span>
+            <span className="text-xs font-semibold">
+                {place}
+            </span>
 
-                <span
-                    className={[
-                        "h-px flex-1",
-                        style.rail,
-                    ].join(" ")}
-                />
-            </div>
+            <span
+                className="
+                    text-xs
+                    tabular-nums
+                    text-muted-foreground
+                "
+            >
+                {time}
+            </span>
+        </div>
+    );
+}
 
+function CodePanel({
+                       children,
+                   }: {
+    children: ReactNode;
+}) {
+    return (
+        <pre
+            className="
+                mt-5
+                max-w-[560px]
+                overflow-x-auto
+                rounded-xl
+                bg-[#151515]
+                p-4
+                text-xs leading-6
+                text-[#EEEEEE]
+            "
+        >
+            <code>{children}</code>
+        </pre>
+    );
+}
+
+function ResultMetric({
+                          children,
+                      }: {
+    children: ReactNode;
+}) {
+    return (
+        <div
+            className="
+                inline-flex
+                min-h-11
+                items-center
+                rounded-xl
+                bg-[#EDF8F2]
+                px-4 py-2.5
+                text-sm font-medium
+                text-[#276849]
+                dark:bg-[#24352C]
+                dark:text-[#9DCEAF]
+            "
+        >
             {children}
         </div>
     );
 }
 
-function Callout({
-                     children,
-                     tone,
-                 }: {
-    children: ReactNode;
-    tone: AccentTone;
-}) {
-    const style = toneStyles[tone];
-
-    return (
-        <div
-            className={[
-                "rounded-xl border p-5",
-                style.bg,
-                style.border,
-            ].join(" ")}
-        >
-            <p
-                className="
-                    max-w-[820px]
-                    break-keep
-                    text-sm leading-7
-                    text-muted-foreground
-                    sm:text-base sm:leading-8
-                "
-            >
-                {children}
-            </p>
-        </div>
-    );
-}
-
-function DecisionNote({
-                          label,
-                          title,
+function LearningNote({
                           children,
                       }: {
-    label: string;
-    title: string;
     children: ReactNode;
 }) {
-    const style = toneStyles.tradeoff;
-
     return (
         <div
-            className={[
-                "mt-6 rounded-2xl border p-6",
-                style.bg,
-                style.border,
-            ].join(" ")}
+            className="
+                mt-5
+                flex max-w-[850px]
+                gap-3
+                text-sm leading-7
+                text-muted-foreground
+            "
         >
-            <span
-                className={[
-                    "inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold",
-                    style.badge,
-                ].join(" ")}
-            >
-                {label}
+            <span className="shrink-0">
+                💡
             </span>
 
-            <h4
-                className="
-                    mt-4 max-w-[760px]
-                    break-keep
-                    text-lg font-bold leading-7
-                "
-            >
-                {title}
-            </h4>
-
-            <div
-                className="
-                    mt-3 max-w-[800px]
-                    space-y-3
-                    break-keep
-                    text-sm leading-7
-                    text-muted-foreground
-                    sm:text-base
-                "
-            >
+            <p>
+                <span className="font-semibold text-foreground">
+                    배운 점:
+                </span>{" "}
                 {children}
+            </p>
+        </div>
+    );
+}
+
+function PendingNotice({
+                           children,
+                       }: {
+    children: ReactNode;
+}) {
+    return (
+        <div
+            className="
+                max-w-[850px]
+                rounded-xl
+                border border-dashed
+                border-[#D7C58D]
+                bg-[#FFFDF7]
+                p-4
+                text-sm leading-7
+                text-muted-foreground
+                dark:border-[#5F5636]
+                dark:bg-black/10
+            "
+        >
+            <div className="flex gap-3">
+                <TriangleAlert
+                    className="
+                        mt-1
+                        size-4 shrink-0
+                        text-[#9B7C29]
+                    "
+                />
+
+                <div>{children}</div>
             </div>
         </div>
     );
 }
 
-function JudgementCard({
-                           title,
-                           value,
-                           description,
-                           selected = false,
-                       }: {
+function MetricList({
+                        items,
+                    }: {
+    items: readonly string[];
+}) {
+    return (
+        <div
+            className="
+                grid max-w-[760px]
+                gap-2
+                sm:grid-cols-2
+            "
+        >
+            {items.map((item) => (
+                <div
+                    key={item}
+                    className="
+                        flex items-center
+                        justify-between gap-4
+                        rounded-xl
+                        bg-[#EDF8F2]
+                        px-4 py-3
+                        text-xs
+                        dark:bg-[#24352C]
+                    "
+                >
+                    <span className="font-medium">
+                        {item}
+                    </span>
+
+                    <span
+                        className="
+                            shrink-0
+                            text-[10px] font-semibold
+                            text-[#41765A]
+                            dark:text-[#83B497]
+                        "
+                    >
+                        측정 예정
+                    </span>
+                </div>
+            ))}
+        </div>
+    );
+}
+
+function OutcomeBox({
+                        title,
+                        value,
+                        success = false,
+                    }: {
     title: string;
     value: string;
-    description: string;
-    selected?: boolean;
+    success?: boolean;
 }) {
     return (
         <div
-            className={[
-                "rounded-xl border p-4",
-                selected
-                    ? "border-[#C2D8CA] bg-[#F0F6F2] dark:border-[#3C5C49] dark:bg-[#19251E]"
-                    : "border-border bg-background",
-            ].join(" ")}
-        >
-            <p
-                className={[
-                    "text-xs font-semibold",
-                    selected
-                        ? "text-[#41765A] dark:text-[#83B497]"
-                        : "text-muted-foreground",
-                ].join(" ")}
-            >
-                {title}
-            </p>
-
-            <p className="mt-2 font-semibold">
-                {value}
-            </p>
-
-            <p className="mt-2 break-keep text-xs leading-5 text-muted-foreground">
-                {description}
-            </p>
-        </div>
-    );
-}
-
-/* -------------------------------------------------------------------------- */
-/* Alternative / Trade-off                                                    */
-
-/* -------------------------------------------------------------------------- */
-
-function AlternativeCard({
-                             label,
-                             title,
-                             items,
-                             selected = false,
-                         }: {
-    label: string;
-    title: string;
-    items: readonly string[];
-    selected?: boolean;
-}) {
-    return (
-        <div
-            className={[
-                "relative rounded-xl border p-5",
-                selected
-                    ? "border-[#C2D8CA] bg-[#F0F6F2] dark:border-[#3C5C49] dark:bg-[#19251E]"
-                    : "border-border bg-background",
-            ].join(" ")}
-        >
-            {selected && (
-                <span
-                    className="
-                        absolute right-4 top-4
-                        rounded-full
-                        bg-[#41765A]
-                        px-2 py-1
-                        text-[9px] font-bold
-                        text-white
-                    "
-                >
-                    선택
-                </span>
-            )}
-
-            <p
-                className={[
-                    "text-[10px] font-bold",
-                    selected
-                        ? "text-[#41765A] dark:text-[#83B497]"
-                        : "text-muted-foreground",
-                ].join(" ")}
-            >
-                {label}
-            </p>
-
-            <h4 className="mt-2 break-keep text-base font-semibold">
-                {title}
-            </h4>
-
-            <ul className="mt-4 space-y-2.5">
-                {items.map((item) => (
-                    <li
-                        key={item}
-                        className="
-                            flex gap-2
-                            break-keep
-                            text-xs leading-5
-                            text-muted-foreground
-                        "
-                    >
-                        <span
-                            className={[
-                                "mt-[8px] size-1 shrink-0 rounded-full",
-                                selected
-                                    ? "bg-[#41765A]"
-                                    : "bg-muted-foreground/40",
-                            ].join(" ")}
-                        />
-
-                        {item}
-                    </li>
-                ))}
-            </ul>
-        </div>
-    );
-}
-
-function TradeOffComparison({
-                                benefits,
-                                costs,
-                            }: {
-    benefits: readonly string[];
-    costs: readonly string[];
-}) {
-    return (
-        <div className="grid gap-4 md:grid-cols-2">
-            <div
-                className="
-                    rounded-xl
-                    border border-[#C2D8CA]
-                    bg-[#F0F6F2]
-                    p-5
-                    dark:border-[#3C5C49]
-                    dark:bg-[#19251E]
-                "
-            >
-                <p className="font-semibold text-[#41765A] dark:text-[#83B497]">
-                    얻은 것
-                </p>
-
-                <ul className="mt-4 space-y-3">
-                    {benefits.map((item) => (
-                        <li
-                            key={item}
-                            className="
-                                flex gap-3
-                                break-keep
-                                text-sm leading-6
-                            "
-                        >
-                            <span className="font-bold text-[#41765A]">
-                                +
-                            </span>
-
-                            <span className="text-muted-foreground">
-                                {item}
-                            </span>
-                        </li>
-                    ))}
-                </ul>
-            </div>
-
-            <div
-                className="
-                    rounded-xl
-                    border border-[#DED0A6]
-                    bg-[#FAF6EA]
-                    p-5
-                    dark:border-[#5F5636]
-                    dark:bg-[#292419]
-                "
-            >
-                <p className="font-semibold text-[#A48432] dark:text-[#D9BC72]">
-                    감수한 것
-                </p>
-
-                <ul className="mt-4 space-y-3">
-                    {costs.map((item) => (
-                        <li
-                            key={item}
-                            className="
-                                flex gap-3
-                                break-keep
-                                text-sm leading-6
-                            "
-                        >
-                            <span className="font-bold text-[#A48432]">
-                                −
-                            </span>
-
-                            <span className="text-muted-foreground">
-                                {item}
-                            </span>
-                        </li>
-                    ))}
-                </ul>
-            </div>
-        </div>
-    );
-}
-
-/* -------------------------------------------------------------------------- */
-/* Diagram Components                                                         */
-
-/* -------------------------------------------------------------------------- */
-
-function ResponsibilityCard({
-                                label,
-                                badge,
-                                title,
-                                description,
-                            }: {
-    label: string;
-    badge: string;
-    title: string;
-    description: string;
-}) {
-    return (
-        <div
-            className="
+            className={`
                 rounded-xl
-                border border-border
-                bg-background
-                p-5
-            "
+                border
+                px-4 py-3.5
+                ${
+                success
+                    ? "border-[#BDD9C7] bg-[#EEF7F1] dark:border-[#3C5C49] dark:bg-[#19251E]"
+                    : "border-[#E7C5C8] bg-[#FBF1F2] dark:border-[#633D42] dark:bg-[#2C1E20]"
+            }
+            `}
         >
-            <div className="flex items-center justify-between gap-3">
-                <p
-                    className="
-                        text-[10px] font-bold
-                        uppercase tracking-[0.16em]
-                        text-muted-foreground
-                    "
-                >
-                    {label}
-                </p>
-
-                <span
-                    className="
-                        rounded-full
-                        bg-muted
-                        px-2 py-1
-                        text-[9px] font-semibold
-                        text-muted-foreground
-                    "
-                >
-                    {badge}
-                </span>
-            </div>
-
-            <p className="mt-4 break-keep text-base font-semibold">
+            <p className="text-xs font-semibold">
                 {title}
             </p>
 
             <p
                 className="
-                    mt-2 max-w-[420px]
-                    break-keep
-                    text-sm leading-6
+                    mt-1.5
+                    text-xs
                     text-muted-foreground
                 "
             >
-                {description}
+                {value}
             </p>
         </div>
     );
 }
 
-function FlowDiagram({
-                         items,
-                     }: {
-    items: readonly string[];
-}) {
-    return (
-        <div className="w-full">
-            <div
-                className="hidden w-full gap-5 md:grid"
-                style={{
-                    gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))`,
-                }}
-            >
-                {items.map((item, index) => (
-                    <div
-                        key={`${item}-${index}`}
-                        className="relative min-w-0"
-                    >
-                        <div
-                            className="
-                                flex h-full min-h-[54px]
-                                items-center justify-center
-                                rounded-lg
-                                border border-border
-                                bg-background
-                                px-2 py-3
-                                text-center
-                                text-xs font-medium
-                                leading-5
-                            "
-                        >
-                            <span className="break-keep">
-                                {item}
-                            </span>
-                        </div>
-
-                        {index < items.length - 1 && (
-                            <ArrowRight
-                                className="
-                                    absolute
-                                    -right-[17px]
-                                    top-1/2
-                                    size-3.5
-                                    -translate-y-1/2
-                                    text-muted-foreground/35
-                                "
-                            />
-                        )}
-                    </div>
-                ))}
-            </div>
-
-            <div className="flex flex-col md:hidden">
-                {items.map((item, index) => (
-                    <div
-                        key={`${item}-${index}`}
-                        className="flex flex-col items-center"
-                    >
-                        <div
-                            className="
-                                w-full rounded-lg
-                                border border-border
-                                bg-background
-                                px-4 py-3
-                                text-center
-                                text-sm font-medium
-                            "
-                        >
-                            {item}
-                        </div>
-
-                        {index < items.length - 1 && (
-                            <ArrowRight
-                                className="
-                                    my-1.5
-                                    size-4 rotate-90
-                                    text-muted-foreground/35
-                                "
-                            />
-                        )}
-                    </div>
-                ))}
-            </div>
-        </div>
-    );
-}
-
-/* -------------------------------------------------------------------------- */
-/* Other Components                                                           */
-
-/* -------------------------------------------------------------------------- */
-
-function NextDecisionCard({
-                              title,
-                              description,
-                              action,
-                              onClick,
-                          }: {
-    title: string;
-    description: string;
-    action: string;
-    onClick: () => void;
-}) {
-    return (
-        <button
-            type="button"
-            onClick={onClick}
-            className="
-                group w-full
-                rounded-xl
-                border border-border
-                bg-background
-                p-6 text-left
-                transition-all
-                hover:border-foreground/25
-                hover:bg-muted/30
-            "
-        >
-            <div
-                className="
-                    flex flex-col
-                    justify-between gap-5
-                    sm:flex-row sm:items-center
-                "
-            >
-                <div>
-                    <p className="break-keep text-base font-semibold">
-                        {title}
-                    </p>
-
-                    <p
-                        className="
-                            mt-2 max-w-[700px]
-                            break-keep
-                            text-sm leading-6
-                            text-muted-foreground
-                        "
-                    >
-                        {description}
-                    </p>
-                </div>
-
-                <div
-                    className="
-                        flex shrink-0
-                        items-center gap-2
-                        text-sm font-bold
-                    "
-                >
-                    {action}
-
-                    <ArrowRight
-                        className="
-                            size-4
-                            transition-transform
-                            group-hover:translate-x-1
-                        "
-                    />
-                </div>
-            </div>
-        </button>
-    );
-}
-
-function ExperimentLink({
-                            title,
-                            description,
-                        }: {
+function PendingResult({
+                           title,
+                           description,
+                       }: {
     title: string;
     description: string;
 }) {
     return (
         <div
             className="
-                group flex
-                items-center justify-between
-                gap-5 rounded-xl
-                border border-border
-                px-4 py-3
-                transition-colors
-                hover:bg-muted/40
+                rounded-xl
+                border border-dashed
+                border-[#B9DCC9]
+                bg-white/60
+                p-4
+                dark:border-[#3C5C49]
+                dark:bg-black/10
             "
         >
-            <div>
-                <p className="break-keep text-sm font-medium">
+            <div className="flex items-center gap-2">
+                <p className="text-xs font-semibold">
                     {title}
                 </p>
 
-                <p
+                <span
                     className="
-                        mt-1 break-keep
-                        text-xs leading-5
+                        rounded-full
+                        bg-muted
+                        px-2 py-0.5
+                        text-[9px] font-bold
                         text-muted-foreground
                     "
                 >
-                    {description}
-                </p>
+                    PENDING
+                </span>
             </div>
 
-            <span
-                className="
-                    shrink-0 rounded-full
-                    border border-[#DED0A6]
-                    bg-[#FAF6EA]
-                    px-2 py-1
-                    text-[10px] font-semibold
-                    text-[#A48432]
-                    dark:border-[#5F5636]
-                    dark:bg-[#292419]
-                    dark:text-[#D9BC72]
-                "
-            >
-                실험 예정
-            </span>
-        </div>
-    );
-}
-
-function StatusCard({
-                        title,
-                        description,
-                        tone,
-                    }: {
-    title: string;
-    description: string;
-    tone: AccentTone;
-}) {
-    const style = toneStyles[tone];
-
-    return (
-        <div
-            className={[
-                "rounded-xl border p-4",
-                style.bg,
-                style.border,
-            ].join(" ")}
-        >
-            <p
-                className={[
-                    "text-sm font-semibold",
-                    style.text,
-                ].join(" ")}
-            >
-                {title}
-            </p>
-
             <p
                 className="
-                    mt-1 break-keep
-                    text-xs leading-5
+                    mt-2
+                    text-xs leading-6
                     text-muted-foreground
                 "
             >
@@ -3179,132 +3307,179 @@ function StatusCard({
     );
 }
 
-function SnapshotCard({
-                          label,
-                          title,
-                          items,
-                      }: {
-    label: string;
-    title: string;
-    items: readonly string[];
+function StatusBadge({
+                         status,
+                     }: {
+    status: StatusType;
 }) {
+    const styles = {
+        implemented:
+            "border-[#BDD9C7] bg-[#EEF7F1] text-[#41765A] dark:border-[#3C5C49] dark:bg-[#19251E] dark:text-[#83B497]",
+
+        partial:
+            "border-[#C8D6F0] bg-[#F1F4FA] text-[#496AA8] dark:border-[#3E4C69] dark:bg-[#1B2230] dark:text-[#91A9D7]",
+
+        planned:
+            "border-[#E1D19F] bg-[#FAF6EA] text-[#9B7C29] dark:border-[#5F5636] dark:bg-[#292419] dark:text-[#D9BC72]",
+    };
+
+    const labels = {
+        implemented: "구현 완료",
+        partial: "검증 진행",
+        planned: "검증 예정",
+    };
+
     return (
-        <div
-            className="
-                rounded-xl
-                border border-[#C6D0E4]
-                bg-[#F1F4FA]
-                p-5
-                dark:border-[#3E4C69]
-                dark:bg-[#1B2230]
-            "
+        <span
+            className={`
+                inline-flex h-6
+                items-center
+                rounded-full
+                border
+                px-2.5
+                text-[9px] font-bold
+                ${styles[status]}
+            `}
         >
-            <p className="text-[10px] font-bold text-[#496AA8] dark:text-[#91A9D7]">
-                {label}
-            </p>
-
-            <h4 className="mt-2 font-semibold">
-                {title}
-            </h4>
-
-            <ul className="mt-4 space-y-2">
-                {items.map((item) => (
-                    <li
-                        key={item}
-                        className="
-                            flex gap-2
-                            text-xs leading-5
-                            text-muted-foreground
-                        "
-                    >
-                        <span className="mt-[8px] size-1 shrink-0 rounded-full bg-[#496AA8]"/>
-                        {item}
-                    </li>
-                ))}
-            </ul>
-        </div>
+            {labels[status]}
+        </span>
     );
 }
 
-function ArchitectureBox({
-                             children,
-                             tone,
-                         }: {
+function TechnologyPill({
+                            children,
+                        }: {
     children: ReactNode;
-    tone: AccentTone;
 }) {
-    const style = toneStyles[tone];
-
     return (
-        <div
-            className={[
-                "rounded-xl border p-6",
-                style.bg,
-                style.border,
-            ].join(" ")}
+        <span
+            className="
+                inline-flex h-8
+                items-center
+                rounded-full
+                border border-[#C9D8FF]
+                bg-[#F7F9FF]
+                px-3
+                text-[11px] font-medium
+                text-[#315FEA]
+                dark:border-blue-900
+                dark:bg-blue-950/20
+                dark:text-blue-300
+            "
         >
             {children}
-        </div>
+        </span>
     );
 }
 
-function ArchitectureNode({
-                              title,
-                              subtitle,
-                          }: {
-    title: string;
-    subtitle: string;
+function TechBadge({
+                       name,
+                       icon: Icon,
+                   }: {
+    name: string;
+    icon: ComponentType<{
+        className?: string;
+    }>;
 }) {
     return (
         <div
             className="
-                rounded-lg
+                inline-flex h-8
+                items-center gap-2
+                rounded-full
                 border border-border
                 bg-background
-                px-4 py-3
-                text-center
-                shadow-sm
+                px-3
             "
         >
-            <p className="text-sm font-semibold">
-                {title}
-            </p>
+            <Icon className="size-4"/>
 
-            <p className="mt-1 text-[10px] text-muted-foreground">
-                {subtitle}
-            </p>
+            <span className="text-[11px] font-semibold">
+                {name}
+            </span>
         </div>
     );
 }
 
-function MetricCard({
-                        title,
-                        items,
-                    }: {
+function ExternalButton({
+                            href,
+                            icon,
+                            children,
+                        }: {
+    href: string;
+    icon: ReactNode;
+    children: ReactNode;
+}) {
+    return (
+        <Link
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="
+                inline-flex h-10
+                items-center gap-2
+                rounded-full
+                border border-border
+                bg-background
+                px-4
+                text-xs font-semibold
+                transition-colors
+                hover:bg-muted
+            "
+        >
+            {icon}
+
+            {children}
+
+            <ArrowUpRight className="size-3.5"/>
+        </Link>
+    );
+}
+
+function AdditionalCard({
+                            icon,
+                            title,
+                            description,
+                            tags,
+                        }: {
+    icon: ReactNode;
     title: string;
-    items: readonly string[];
+    description: string;
+    tags: readonly string[];
 }) {
     return (
         <div
             className="
-                rounded-xl
+                rounded-[22px]
                 border border-border
                 bg-background
-                p-5
+                p-6
             "
         >
-            <p className="font-semibold">
+            <div className="text-muted-foreground">
+                {icon}
+            </div>
+
+            <h3 className="mt-4 text-base font-bold">
                 {title}
+            </h3>
+
+            <p
+                className="
+                    mt-3
+                    break-keep
+                    text-sm leading-7
+                    text-muted-foreground
+                "
+            >
+                {description}
             </p>
 
-            <div className="mt-3 flex flex-wrap gap-2">
-                {items.map((item) => (
-                    <Badge
-                        key={item}
-                        variant="outline"
-                    >
-                        {item}
-                    </Badge>
+            <div className="mt-5 flex flex-wrap gap-2">
+                {tags.map((tag) => (
+                    <TechnologyPill key={tag}>
+                        {tag}
+                    </TechnologyPill>
                 ))}
             </div>
         </div>
