@@ -18,7 +18,6 @@ import {
     Github,
     KeyRound,
     Radio,
-    TriangleAlert,
 } from "lucide-react";
 
 import {Java} from "@/components/ui/svgs/java";
@@ -54,7 +53,6 @@ const PROJECT_DEPLOY_URL: string | null = null;
 
 type StatusType =
     | "implemented"
-    | "partial"
     | "planned";
 
 type StarType =
@@ -168,12 +166,12 @@ const coreFeatures: readonly CoreFeature[] = [
             "긴 일정 생성 작업을 HTTP 요청에서 분리",
 
         summary:
-            "generationId를 먼저 반환하고 외부 API 호출과 후보 수집은 Worker가 처리하도록 변경했습니다.",
+            "generationId를 먼저 반환하고 후보 수집과 외부 API 작업은 RabbitMQ Worker가 이어서 처리하도록 책임을 분리했습니다.",
 
         technologies: [
             "RabbitMQ",
             "Worker",
-            "Generation Status",
+            "Generation",
         ],
 
         status: "implemented",
@@ -181,15 +179,15 @@ const coreFeatures: readonly CoreFeature[] = [
         situation: (
             <>
                 <Paragraph>
-                    일정 생성에는 Google Places를 통한 장소 후보 수집처럼
-                    응답 시간을 애플리케이션이 직접 통제하기 어려운
+                    일정 생성에는 Google Places를 이용한 후보 수집처럼
+                    응답 시간과 장애 여부를 애플리케이션이 직접 통제하기 어려운
                     외부 API 호출이 포함됩니다.
                 </Paragraph>
 
                 <Paragraph>
-                    이 작업을 하나의 HTTP 요청 안에서 모두 처리하면
-                    외부 시스템의 지연과 장애가
-                    사용자 요청의 응답 시간에 그대로 영향을 줍니다.
+                    이를 하나의 HTTP 요청에서 끝까지 처리하면
+                    사용자 요청의 생명주기가
+                    후보 수집과 외부 API의 처리 시간에 종속됩니다.
                 </Paragraph>
 
                 <SimpleFlow
@@ -198,6 +196,7 @@ const coreFeatures: readonly CoreFeature[] = [
                         "후보 수집",
                         "Google Places",
                         "후보 저장",
+                        "일정 준비",
                         "HTTP 응답",
                     ]}
                     danger
@@ -208,10 +207,10 @@ const coreFeatures: readonly CoreFeature[] = [
         task: (
             <BulletList
                 items={[
-                    "HTTP 요청과 오래 걸리는 작업의 생명주기 분리",
-                    "요청 종료 이후에도 후보 수집 작업 지속",
-                    "현재 작업 진행 상태를 Generation 단위로 추적",
-                    "Retry · Redelivery를 적용할 수 있는 실행 구조 확보",
+                    "사용자 HTTP 요청과 오래 걸리는 Background Job의 생명주기 분리",
+                    "HTTP 응답 종료 후에도 후보 수집 작업이 계속될 수 있는 실행 구조 확보",
+                    "Generation 단위 상태 추적",
+                    "Retry · Redelivery · 장애 복구가 가능한 Worker 실행 경계 확보",
                 ]}
             />
         ),
@@ -219,7 +218,8 @@ const coreFeatures: readonly CoreFeature[] = [
         action: (
             <>
                 <Paragraph>
-                    HTTP 요청은 Generation을 생성하고
+                    요청 스레드는 Generation과
+                    실행 시점의 InputSnapshot을 생성하고
                     <Strong>
                         {" "}generationId를 반환하는 것까지
                     </Strong>
@@ -227,19 +227,19 @@ const coreFeatures: readonly CoreFeature[] = [
                 </Paragraph>
 
                 <Paragraph>
-                    실제 후보 수집은 HTTP 요청에서 분리하고
-                    RabbitMQ 메시지를 소비하는 Worker가
-                    실행하도록 변경했습니다.
+                    실제 후보 수집은 RabbitMQ Message를 소비하는
+                    Worker가 처리합니다.
+                    이후 진행 상태는 Generation 상태로 관리합니다.
                 </Paragraph>
 
                 <SimpleFlow
                     items={[
                         "HTTP Request",
-                        "Generation",
+                        "Generation 생성",
+                        "Outbox 저장",
                         "generationId 반환",
                         "RabbitMQ",
                         "Worker",
-                        "후보 수집",
                     ]}
                 />
             </>
@@ -258,12 +258,12 @@ const coreFeatures: readonly CoreFeature[] = [
                     <ResultMetric>
                         외부 API
                         <strong className="ml-1">
-                            HTTP 생명주기와 분리
+                            요청 생명주기와 분리
                         </strong>
                     </ResultMetric>
 
                     <ResultMetric>
-                        상태 추적
+                        작업 추적
                         <strong className="ml-1">
                             Generation 기반
                         </strong>
@@ -271,12 +271,11 @@ const coreFeatures: readonly CoreFeature[] = [
                 </div>
 
                 <LearningNote>
-                    비동기 전환의 결과를 단순히
-                    전체 처리 속도 개선으로 표현하지 않고,
-                    사용자 HTTP 요청과 실제 작업 실행의
-                    책임을 분리한 것으로 정리했습니다.
-                    이후 동일 조건에서 접수 API의
-                    p50 · p95도 측정할 예정입니다.
+                    비동기 전환의 목적을 단순히
+                    처리 시간을 줄이는 것으로 잡지 않았습니다.
+                    사용자 요청과 실제 작업 실행의 책임을 분리하고,
+                    이후 실패·재실행을 다룰 수 있는 경계를 만드는 것을
+                    우선했습니다.
                 </LearningNote>
             </>
         ),
@@ -289,7 +288,7 @@ const coreFeatures: readonly CoreFeature[] = [
             "DB 저장과 메시지 전달 사이의 작업 유실 방지",
 
         summary:
-            "Transactional Outbox와 Debezium CDC를 적용해 DB와 RabbitMQ 사이의 Dual Write 경계를 분리했습니다.",
+            "Transactional Outbox와 Debezium CDC를 적용해 DB Commit과 RabbitMQ Publish의 Dual Write 문제를 분리했습니다.",
 
         technologies: [
             "Outbox",
@@ -303,18 +302,18 @@ const coreFeatures: readonly CoreFeature[] = [
         situation: (
             <>
                 <Paragraph>
-                    Generation을 PostgreSQL에 저장한 뒤
-                    RabbitMQ로 메시지를 직접 발행하면
-                    두 작업은 서로 다른 시스템에서 실행됩니다.
+                    Generation을 PostgreSQL에 저장한 직후
+                    애플리케이션이 RabbitMQ로 직접 Message를 발행하면
+                    두 작업은 서로 다른 시스템에 기록됩니다.
                 </Paragraph>
 
                 <DualWriteDiagram/>
 
                 <Paragraph>
                     DB Commit은 성공했지만
-                    RabbitMQ Publish가 실패하면
-                    DB에는 작업이 존재하는데
-                    Worker는 작업의 존재를 모르는 상태가 만들어집니다.
+                    Message Publish가 실패하면
+                    DB에는 처리할 작업이 존재하지만
+                    Worker는 그 작업의 존재를 알 수 없습니다.
                 </Paragraph>
             </>
         ),
@@ -322,10 +321,10 @@ const coreFeatures: readonly CoreFeature[] = [
         task: (
             <BulletList
                 items={[
-                    "Generation 저장과 작업 전달 의도를 함께 보존",
-                    "DB Transaction과 Message Publish 실패 경계 분리",
-                    "Application과 RabbitMQ 직접 결합 제거",
-                    "CDC 중단 이후에도 이어서 처리 가능한 구조 확보",
+                    "Generation 저장과 작업 전달 의도를 하나의 DB Transaction으로 보존",
+                    "PostgreSQL과 RabbitMQ를 하나의 원자적 Transaction처럼 취급하지 않기",
+                    "Message Publish 실패가 Business Transaction을 깨뜨리지 않도록 장애 경계 분리",
+                    "CDC 중단 이후에도 전달 작업을 다시 시작할 수 있는 구조 확보",
                 ]}
             />
         ),
@@ -337,9 +336,9 @@ const coreFeatures: readonly CoreFeature[] = [
                     InputSnapshot,
                     Outbox Event를
                     <Strong>
-                        {" "}하나의 PostgreSQL Transaction
+                        {" "}동일 PostgreSQL Transaction
                     </Strong>
-                    에서 함께 저장했습니다.
+                    에서 저장했습니다.
                 </Paragraph>
 
                 <SimpleFlow
@@ -354,8 +353,10 @@ const coreFeatures: readonly CoreFeature[] = [
                 />
 
                 <Paragraph>
-                    Debezium이 PostgreSQL WAL의 Outbox 변경을 읽어
-                    RabbitMQ로 전달하도록 구성했습니다.
+                    Debezium은 PostgreSQL WAL에서
+                    Outbox 변경을 읽어 RabbitMQ로 전달합니다.
+                    따라서 Application은 RabbitMQ Publish 성공 여부를
+                    Business Transaction 안에서 책임지지 않습니다.
                 </Paragraph>
             </>
         ),
@@ -378,17 +379,18 @@ const coreFeatures: readonly CoreFeature[] = [
                     </ResultMetric>
 
                     <ResultMetric>
-                        장애 경계
+                        실패 경계
                         <strong className="ml-1">
-                            CDC 복구 문제로 분리
+                            CDC 복구 문제로 전환
                         </strong>
                     </ResultMetric>
                 </div>
 
                 <LearningNote>
-                    Outbox를 적용한다고 장애 자체가 없어지는 것은 아니었습니다.
-                    대신 DB와 MQ 사이의 Dual Write 문제를
-                    재시작 가능한 CDC 전달 문제로 변경했습니다.
+                    Outbox를 적용한다고 장애가 사라지는 것은 아니었습니다.
+                    대신 DB와 MQ를 동시에 성공시켜야 하는 문제를
+                    DB에 전달 의도를 먼저 보존하고
+                    CDC를 다시 실행할 수 있는 문제로 바꿨습니다.
                 </LearningNote>
             </>
         ),
@@ -398,43 +400,47 @@ const coreFeatures: readonly CoreFeature[] = [
         number: "03",
 
         title:
-            "최소 한 번 전달에서도 다시 실행 가능한 Worker 설계",
+            "At-least-once 환경에서 재실행 가능한 Worker 설계",
 
         summary:
-            "ACK 실패와 Redelivery를 전제로 중복 전달 자체보다 재실행에 안전한 Consumer를 설계했습니다.",
+            "Message 중복 전달과 Worker 중단을 전제로 Claim · Lease · Fencing을 적용해 오래된 실행 결과가 최신 상태를 덮어쓰지 못하도록 했습니다.",
 
         technologies: [
-            "ACK",
-            "Redelivery",
-            "Idempotency",
+            "At-least-once",
+            "Claim",
+            "Lease",
+            "Fencing",
             "DLQ",
         ],
 
-        status: "partial",
+        status: "implemented",
 
         situation: (
             <>
                 <Paragraph>
-                    RabbitMQ Worker가 후보 데이터 저장까지 완료하더라도
+                    RabbitMQ에서는 Worker가 DB 처리를 완료한 뒤
                     ACK를 전송하기 전에 종료되면
-                    RabbitMQ는 처리 완료 사실을 알 수 없습니다.
+                    동일 Message가 다시 전달될 수 있습니다.
                 </Paragraph>
 
                 <SimpleFlow
                     items={[
                         "Message",
-                        "Worker",
-                        "DB Commit",
-                        "Worker 종료",
-                        "ACK 실패",
+                        "Worker A",
+                        "DB 작업",
+                        "ACK 전 장애",
                         "Redelivery",
+                        "Worker B",
                     ]}
                     danger
                 />
 
                 <Paragraph>
-                    따라서 한 번 처리한 메시지가
-                    다시 Consumer에게 전달될 수 있습니다.
+                    더 어려운 문제는 Worker A가 완전히 종료된 것이 아니라
+                    장시간 멈췄다가 늦게 다시 실행되는 경우입니다.
+                    Worker B가 이미 복구 작업을 완료한 뒤
+                    Worker A가 늦게 저장하면
+                    최신 결과를 오래된 실행이 덮어쓸 수 있습니다.
                 </Paragraph>
             </>
         ),
@@ -442,33 +448,48 @@ const coreFeatures: readonly CoreFeature[] = [
         task: (
             <BulletList
                 items={[
-                    "같은 메시지가 다시 전달돼도 데이터 중복 방지",
-                    "작업 중 Worker가 종료돼도 다시 실행 가능",
-                    "허용되지 않은 Generation 상태 전이 차단",
-                    "반복 실패 Message를 정상 Queue에서 격리",
+                    "중복 Message를 제거하는 대신 중복 전달 자체를 정상 시나리오로 취급",
+                    "현재 Generation을 처리할 권한이 있는 Worker 식별",
+                    "처리 권한이 만료된 Stale Worker의 Write 차단",
+                    "COLLECTING_CANDIDATES에 고착된 Generation 자동 탐지 및 재전달",
+                    "반복 실패 Message를 Retry 후 DLQ로 격리",
                 ]}
             />
         ),
 
         action: (
             <>
-                <BulletList
-                    items={[
-                        "generationId 기준 기존 Generation 상태 확인",
-                        "허용된 상태 전이만 수행하는 State Guard",
-                        "DB Constraint를 통한 중복 데이터 최종 방어",
-                        "Retry 및 DLQ 구조 적용",
-                        "At-least-once 전달을 전제로 Consumer 설계",
-                    ]}
-                />
+                <Paragraph>
+                    Generation에
+                    <Strong>
+                        {" "}collectionClaimVersion
+                    </Strong>
+                    과
+                    <Strong>
+                        {" "}processing lease
+                    </Strong>
+                    를 도입했습니다.
+                </Paragraph>
 
                 <SimpleFlow
                     items={[
-                        "Redelivery",
-                        "상태 확인",
-                        "이미 처리?",
-                        "멱등 처리",
-                        "정상 종료",
+                        "Message 수신",
+                        "Claim 획득",
+                        "claimVersion 증가",
+                        "후보 수집",
+                        "Claim 재검증",
+                        "READY 저장",
+                    ]}
+                />
+
+                <BulletList
+                    items={[
+                        "기본 Processing Lease 15분",
+                        "Worker가 Claim할 때마다 collectionClaimVersion 증가",
+                        "후보 저장과 FAILED 전환 직전 현재 Claim 소유권 재검증",
+                        "이전 claimVersion을 가진 Worker의 늦은 성공/실패 결과는 무시",
+                        "Lease 만료 Generation을 Scheduler가 조회해 RabbitMQ로 자동 재전달",
+                        "기본 1분 간격 Stale Scan · 최대 50건 Batch Recovery",
                     ]}
                 />
             </>
@@ -485,27 +506,27 @@ const coreFeatures: readonly CoreFeature[] = [
                     </ResultMetric>
 
                     <ResultMetric>
-                        Consumer
+                        Stale Write
                         <strong className="ml-1">
-                            재실행 가능 구조
+                            Claim Version으로 차단
                         </strong>
                     </ResultMetric>
 
                     <ResultMetric>
-                        반복 실패
+                        Stuck Job
                         <strong className="ml-1">
-                            DLQ 격리
+                            Lease 만료 후 자동 재전달
                         </strong>
                     </ResultMetric>
                 </div>
 
-                <PendingNotice>
-                    현재 상태 Guard와 DLQ 인프라는 구성했지만
-                    ACK 이전 Worker 종료를 실제로 주입하는
-                    Redelivery 테스트는 진행 전입니다.
-                    실험 후 중복 Candidate 수와 정상 완료율을
-                    실제 수치로 추가합니다.
-                </PendingNotice>
+                <LearningNote>
+                    멱등성을 단순히
+                    “이미 처리했으면 return”으로 끝내지 않고,
+                    동시에 여러 실행이 존재할 수 있다는 상황까지 확장했습니다.
+                    재실행 가능한 Worker와
+                    오래된 실행을 차단하는 Fencing을 함께 사용했습니다.
+                </LearningNote>
             </>
         ),
     },
@@ -514,16 +535,16 @@ const coreFeatures: readonly CoreFeature[] = [
         number: "04",
 
         title:
-            "형식은 맞지만 실행할 수 없는 AI 일정 차단",
+            "형식상 정상인 AI 결과를 실제 실행 가능한 일정인지 검증",
 
         summary:
-            "AI 응답을 JSON 형식만 검증하지 않고 실제 장소 후보와 시간 조건까지 서버에서 다시 검증합니다.",
+            "Candidate whitelist · 시간 · 사용자 제약뿐 아니라 실제 인접 장소 이동시간까지 서버에서 검증하도록 Validation 경계를 확장했습니다.",
 
         technologies: [
             "Validation",
             "Candidate",
-            "Overlap",
-            "Daily Window",
+            "Routes",
+            "Domain Rule",
         ],
 
         status: "implemented",
@@ -531,17 +552,20 @@ const coreFeatures: readonly CoreFeature[] = [
         situation: (
             <>
                 <Paragraph>
-                    AI가 JSON Schema와 DTO 형식을 정상적으로 만족해도
-                    실제 여행 일정으로는 사용할 수 없는 결과가
+                    AI가 JSON Schema와 DTO 형식을 만족하더라도
+                    실제 여행 일정으로 사용할 수 없는 결과가
                     만들어질 수 있습니다.
                 </Paragraph>
 
                 <ScheduleExample/>
 
                 <Paragraph>
-                    각 일정의 시간 값과 JSON 구조는 모두 정상입니다.
-                    하지만 같은 시간대가 겹치기 때문에
-                    실제 여행 일정으로 사용할 수 없습니다.
+                    시간 중복뿐 아니라
+                    존재하지 않는 Candidate 사용,
+                    같은 장소 반복,
+                    회피 조건 위반,
+                    실제 이동시간보다 짧은 일정 간격도
+                    구조 검증만으로는 판단할 수 없습니다.
                 </Paragraph>
             </>
         ),
@@ -549,43 +573,46 @@ const coreFeatures: readonly CoreFeature[] = [
         task: (
             <BulletList
                 items={[
-                    "서버가 제공하지 않은 장소 사용 차단",
-                    "같은 날짜의 일정 시간 중복 검출",
-                    "하루 경계를 넘어가는 일정 차단",
-                    "사용자가 지정한 활동 가능 시간 검증",
-                    "필수 방문 장소 누락 검증",
+                    "서버가 제공한 Candidate whitelist 밖의 placeId 차단",
+                    "시간 중복 · 일일 활동 가능 시간 · 순서 검증",
+                    "필수 방문 · 회피 조건 검증",
+                    "같은 장소 반복 탐지",
+                    "인접 일정 사이 실제 이동시간 검증",
+                    "일정 자체의 오류와 Routes Provider 장애를 서로 다른 실패로 분리",
                 ]}
             />
         ),
 
         action: (
             <>
-                <Paragraph>
-                    AI 응답 검증을
-                    DTO 구조 검증과
-                    실제 도메인 의미 검증으로 분리했습니다.
-                </Paragraph>
-
                 <SimpleFlow
                     items={[
                         "AI Draft",
                         "Structure",
                         "Candidate",
                         "Time",
-                        "ValidationReport",
+                        "Constraint",
+                        "Routes",
                     ]}
                 />
 
+                <Paragraph>
+                    인접 장소의 좌표를 CandidateSnapshot에서 가져와
+                    Google Routes Adapter를 통해 이동시간을 조회합니다.
+                    이전 일정 종료 시각과 다음 일정 시작 시각 사이의
+                    여유 시간보다 실제 이동시간이 길면
+                    Validation Error로 처리합니다.
+                </Paragraph>
+
                 <CodePanel>
-                    {`시간 구간
+                    {`availableTravelTime
+= next.startTime - previous.endTime
 
-[startMinute, endMinute)
-
-Overlap
-
-A.start < B.end
-AND
-B.start < A.end`}
+if (
+    requiredRouteTime > availableTravelTime
+) {
+    INSUFFICIENT_TRAVEL_TIME
+}`}
                 </CodePanel>
             </>
         ),
@@ -594,31 +621,32 @@ B.start < A.end`}
             <>
                 <div className="flex flex-wrap gap-2">
                     <ResultMetric>
-                        Semantic Error
+                        Domain Validation
                         <strong className="ml-1">
-                            422
+                            실패 시 422
                         </strong>
                     </ResultMetric>
 
                     <ResultMetric>
-                        DB Write
+                        Routes 장애
                         <strong className="ml-1">
-                            없음
+                            Provider Failure로 분리
                         </strong>
                     </ResultMetric>
 
                     <ResultMetric>
-                        Generation
+                        잘못된 일정
                         <strong className="ml-1">
-                            READY 유지
+                            DB Write 전 차단
                         </strong>
                     </ResultMetric>
                 </div>
 
                 <LearningNote>
-                    AI 응답을 파싱 가능한 JSON인지가 아니라
-                    실제 도메인 데이터로 저장 가능한지
-                    서버가 최종 판단하도록 책임을 분리했습니다.
+                    AI를 일정 데이터의 최종 신뢰 주체로 두지 않았습니다.
+                    AI는 결과를 생성하고,
+                    서버가 현재 Snapshot과 도메인 규칙을 기준으로
+                    저장 가능한 결과인지 최종 판단하도록 책임을 분리했습니다.
                 </LearningNote>
             </>
         ),
@@ -634,15 +662,15 @@ const troubleshootingItems: readonly TroubleshootingItem[] = [
         number: "01",
 
         title:
-            "AI가 시간상 실행 불가능한 일정을 반환",
+            "외부 Routes 호출이 DB Transaction을 오래 점유할 수 있는 문제",
 
         summary:
-            "JSON 형식 검증만으로 발견되지 않는 일정 시간 충돌을 서버에서 차단했습니다.",
+            "외부 I/O가 느려져도 DB Lock과 Write Transaction이 함께 길어지지 않도록 검증 단계와 저장 Transaction을 분리했습니다.",
 
         technologies: [
-            "Validation",
-            "Overlap",
-            "HTTP 422",
+            "Transaction",
+            "Pessimistic Lock",
+            "Google Routes",
         ],
 
         status: "implemented",
@@ -651,14 +679,36 @@ const troubleshootingItems: readonly TroubleshootingItem[] = [
             <>
                 <TroubleSection
                     type="situation"
-                    english="BEFORE"
+                    english="PROBLEM"
                     title="문제"
                 >
-                    <ScheduleExample/>
+                    <Paragraph>
+                        일정 검증과 저장 전체를 하나의
+                        <Strong>
+                            {" "}@Transactional
+                        </Strong>
+                        메서드에서 처리하면
+                        Google Routes 같은 외부 API 호출 시간까지
+                        DB Transaction 범위에 포함될 수 있습니다.
+                    </Paragraph>
+
+                    <SimpleFlow
+                        items={[
+                            "Transaction 시작",
+                            "Generation Lock",
+                            "Routes 호출",
+                            "외부 응답 대기",
+                            "일정 저장",
+                            "COMMIT",
+                        ]}
+                        danger
+                    />
 
                     <Paragraph>
-                        JSON 구조와 각각의 시간 값은 정상이라
-                        DTO 검증에서는 오류로 판단되지 않았습니다.
+                        외부 API가 느려질수록
+                        DB Connection과 Row Lock도 함께 오래 유지될 수 있고,
+                        같은 Generation을 처리하는 다른 요청의 대기시간까지
+                        증가할 수 있습니다.
                     </Paragraph>
                 </TroubleSection>
 
@@ -667,13 +717,30 @@ const troubleshootingItems: readonly TroubleshootingItem[] = [
                     english="ACTION"
                     title="해결"
                 >
+                    <Paragraph>
+                        외부 API가 필요한 Validation과
+                        DB Write를 담당하는 Persistence Service를
+                        서로 다른 경계로 분리했습니다.
+                    </Paragraph>
+
+                    <SimpleFlow
+                        items={[
+                            "Generation 조회",
+                            "Validation",
+                            "Routes 호출",
+                            "외부 I/O 종료",
+                            "Write Transaction",
+                            "상태 재검증",
+                        ]}
+                    />
+
                     <BulletList
                         items={[
-                            "HH:mm 값을 minute-of-day로 변환",
-                            "같은 날짜의 모든 일정 Pair 비교",
-                            "[start, end) Interval 적용",
-                            "Overlap 발견 시 ValidationIssue 생성",
-                            "Semantic Error 존재 시 HTTP 422 반환",
+                            "Routes 호출은 Write Transaction 밖에서 수행",
+                            "Validation 완료 후 짧은 Persistence Transaction 시작",
+                            "저장 직전 Generation을 Pessimistic Lock으로 다시 조회",
+                            "READY_FOR_PLANNING 상태를 다시 확인한 뒤 일정 저장",
+                            "동시에 먼저 완료된 요청이 있다면 Replay 정책으로 처리",
                         ]}
                     />
                 </TroubleSection>
@@ -685,31 +752,33 @@ const troubleshootingItems: readonly TroubleshootingItem[] = [
                 >
                     <div className="flex flex-wrap gap-2">
                         <ResultMetric>
-                            잘못된 일정
+                            External I/O
                             <strong className="ml-1">
-                                저장 차단
+                                DB Write Transaction 밖으로 분리
                             </strong>
                         </ResultMetric>
 
                         <ResultMetric>
-                            Generation
+                            동시성
                             <strong className="ml-1">
-                                READY 유지
+                                저장 직전 상태 재검증
                             </strong>
                         </ResultMetric>
 
                         <ResultMetric>
-                            결과 수정
+                            Lock
                             <strong className="ml-1">
-                                재제출 가능
+                                Persistence 구간으로 축소
                             </strong>
                         </ResultMetric>
                     </div>
 
                     <LearningNote>
-                        AI 검증 실패를 Generation 전체 실패로 처리하지 않고
-                        AI 결과만 수정해 다시 제출할 수 있도록
-                        실패 경계를 분리했습니다.
+                        Transaction 범위를 넓게 잡는 것이
+                        항상 더 안전한 것은 아니었습니다.
+                        외부 I/O와 DB Transaction을 분리하되,
+                        경계가 끊어진 사이 상태가 바뀔 수 있으므로
+                        Write 직전에 다시 검증하는 방식으로 보완했습니다.
                     </LearningNote>
                 </TroubleSection>
             </>
@@ -720,15 +789,16 @@ const troubleshootingItems: readonly TroubleshootingItem[] = [
         number: "02",
 
         title:
-            "네트워크 Retry로 동일 AI 결과가 여러 번 제출",
+            "복구 Worker보다 늦게 끝난 Stale Worker가 최신 결과를 덮어쓰는 문제",
 
         summary:
-            "동일 결과 재제출은 안전하게 허용하고 서로 다른 결과는 충돌로 처리했습니다.",
+            "Processing Lease와 Claim Version을 이용한 Fencing으로 현재 처리 권한이 없는 Worker의 늦은 Write를 차단했습니다.",
 
         technologies: [
-            "Idempotency",
-            "Pessimistic Lock",
-            "Unique",
+            "Lease",
+            "Claim Version",
+            "Fencing",
+            "Recovery",
         ],
 
         status: "implemented",
@@ -741,18 +811,138 @@ const troubleshootingItems: readonly TroubleshootingItem[] = [
                     title="문제"
                 >
                     <Paragraph>
-                        서버가 일정 저장을 완료했지만
-                        클라이언트가 네트워크 문제로 응답을 받지 못하면
-                        같은 요청을 다시 제출할 수 있습니다.
+                        Worker A가 후보 수집 도중 장시간 멈추면
+                        Generation은
+                        COLLECTING_CANDIDATES 상태에 남습니다.
                     </Paragraph>
 
                     <SimpleFlow
                         items={[
-                            "Submit",
-                            "DB 저장",
-                            "응답 유실",
-                            "Client Retry",
-                            "중복 저장?",
+                            "Worker A Claim",
+                            "A 지연",
+                            "Lease 만료",
+                            "Worker B 복구",
+                            "B 저장 완료",
+                            "A 뒤늦게 복귀",
+                        ]}
+                        danger
+                    />
+
+                    <Paragraph>
+                        단순 Retry만 적용하면
+                        Worker B가 정상적으로 복구한 뒤
+                        오래된 Worker A의 결과가 늦게 도착해
+                        최신 상태를 덮어쓸 가능성이 생깁니다.
+                    </Paragraph>
+                </TroubleSection>
+
+                <TroubleSection
+                    type="action"
+                    english="ACTION"
+                    title="해결"
+                >
+                    <BulletList
+                        items={[
+                            "Generation마다 collectionClaimVersion 유지",
+                            "Claim 획득 시 Version 증가",
+                            "Claim과 함께 processing lease 만료시각 저장",
+                            "후보 저장과 FAILED 전환 시 현재 Claim Version 재검증",
+                            "현재 Version과 다른 Stale Worker 결과는 Write하지 않고 종료",
+                            "Lease가 만료된 COLLECTING Generation은 Scheduler가 자동 재전달",
+                        ]}
+                    />
+
+                    <SimpleFlow
+                        items={[
+                            "Claim v1",
+                            "Lease 만료",
+                            "Recovery",
+                            "Claim v2",
+                            "v2 저장",
+                            "v1 저장 거절",
+                        ]}
+                    />
+                </TroubleSection>
+
+                <TroubleSection
+                    type="result"
+                    english="RESULT"
+                    title="결과"
+                >
+                    <div className="flex flex-wrap gap-2">
+                        <ResultMetric>
+                            Stale Worker
+                            <strong className="ml-1">
+                                늦은 Write 차단
+                            </strong>
+                        </ResultMetric>
+
+                        <ResultMetric>
+                            Stuck Generation
+                            <strong className="ml-1">
+                                자동 재전달
+                            </strong>
+                        </ResultMetric>
+
+                        <ResultMetric>
+                            Recovery
+                            <strong className="ml-1">
+                                최신 Claim만 상태 변경
+                            </strong>
+                        </ResultMetric>
+                    </div>
+
+                    <LearningNote>
+                        “중복 실행을 막는다”보다
+                        중복 실행이 존재해도
+                        최신 실행만 상태를 변경할 수 있도록 만드는 것이
+                        더 안전한 복구 모델이라는 점을 확인했습니다.
+                    </LearningNote>
+                </TroubleSection>
+            </>
+        ),
+    },
+
+    {
+        number: "03",
+
+        title:
+            "모든 실패를 Retry하면 복구 불가능한 작업까지 반복 실행되는 문제",
+
+        summary:
+            "외부 시스템의 일시 장애와 입력·도메인 오류를 분류해 Retry 가능한 실패만 재시도하고 최종 실패는 DLQ로 격리했습니다.",
+
+        technologies: [
+            "Failure Classification",
+            "Retry",
+            "DLX",
+            "DLQ",
+        ],
+
+        status: "implemented",
+
+        content: (
+            <>
+                <TroubleSection
+                    type="situation"
+                    english="PROBLEM"
+                    title="문제"
+                >
+                    <Paragraph>
+                        Worker에서 Exception이 발생했다는 이유만으로
+                        동일한 Retry 정책을 적용하면
+                        다시 실행해도 성공할 수 없는 실패까지
+                        반복 처리하게 됩니다.
+                    </Paragraph>
+
+                    <SimpleFlow
+                        items={[
+                            "Invalid Input",
+                            "Retry",
+                            "같은 실패",
+                            "Retry",
+                            "같은 실패",
+                            "Worker 자원 낭비",
                         ]}
                         danger
                     />
@@ -763,13 +953,39 @@ const troubleshootingItems: readonly TroubleshootingItem[] = [
                     english="ACTION"
                     title="해결"
                 >
+                    <Paragraph>
+                        WorkerFailureClassifier를 두고
+                        실패를 Retryable과 Non-Retryable로 구분했습니다.
+                    </Paragraph>
+
+                    <div
+                        className="
+                            mt-5 grid
+                            max-w-[760px]
+                            gap-3
+                            sm:grid-cols-2
+                        "
+                    >
+                        <OutcomeBox
+                            title="Retryable"
+                            value="Provider 일시 장애 · Transient DB Error"
+                            success
+                        />
+
+                        <OutcomeBox
+                            title="Non-Retryable"
+                            value="잘못된 입력 · 도메인 오류 · 설정 오류"
+                        />
+                    </div>
+
                     <BulletList
                         items={[
-                            "Generation Pessimistic Lock",
-                            "Generation당 Itinerary UNIQUE Constraint",
-                            "기존 결과와 canonical 비교",
-                            "동일 Replay는 추가 Write 없이 반환",
-                            "서로 다른 결과는 409 Conflict",
+                            "Place Provider Timeout · 408 · 429 · 5xx 등은 Retryable로 분류",
+                            "TransientDataAccessException은 Retryable",
+                            "PlanMate 도메인 오류 · 잘못된 Worker 입력은 Non-Retryable",
+                            "Non-Retryable 실패는 Retry Loop를 즉시 종료",
+                            "최종 Worker 실패는 Listener 밖으로 전파",
+                            "RabbitMQ Container가 reject하고 DLX를 통해 DLQ로 전달",
                         ]}
                     />
                 </TroubleSection>
@@ -779,106 +995,35 @@ const troubleshootingItems: readonly TroubleshootingItem[] = [
                     english="RESULT"
                     title="결과"
                 >
-                    <div
-                        className="
-                            grid max-w-[620px]
-                            gap-3
-                            sm:grid-cols-2
-                        "
-                    >
-                        <OutcomeBox
-                            title="동일 결과 재제출"
-                            value="200 · 추가 DB Write 없음"
-                            success
-                        />
+                    <div className="flex flex-wrap gap-2">
+                        <ResultMetric>
+                            일시 장애
+                            <strong className="ml-1">
+                                제한적 Retry
+                            </strong>
+                        </ResultMetric>
 
-                        <OutcomeBox
-                            title="다른 결과 재제출"
-                            value="409 Conflict"
-                        />
+                        <ResultMetric>
+                            영구 실패
+                            <strong className="ml-1">
+                                불필요한 Retry 차단
+                            </strong>
+                        </ResultMetric>
+
+                        <ResultMetric>
+                            최종 실패
+                            <strong className="ml-1">
+                                DLQ 격리
+                            </strong>
+                        </ResultMetric>
                     </div>
-                </TroubleSection>
-            </>
-        ),
-    },
 
-    {
-        number: "03",
-
-        title:
-            "반복 실패 메시지가 정상 Queue를 계속 점유",
-
-        summary:
-            "재시도로 복구 가능한 실패와 격리해야 할 실패를 구분했습니다.",
-
-        technologies: [
-            "Retry",
-            "DLX",
-            "DLQ",
-        ],
-
-        status: "partial",
-
-        content: (
-            <>
-                <TroubleSection
-                    type="situation"
-                    english="PROBLEM"
-                    title="문제"
-                >
-                    <Paragraph>
-                        처리할 수 없는 메시지를 제한 없이 다시 처리하면
-                        Worker 자원과 정상 메시지 처리 기회를
-                        지속적으로 소비하게 됩니다.
-                    </Paragraph>
-
-                    <SimpleFlow
-                        items={[
-                            "Message",
-                            "실패",
-                            "Retry",
-                            "실패",
-                            "Retry",
-                            "...",
-                        ]}
-                        danger
-                    />
-                </TroubleSection>
-
-                <TroubleSection
-                    type="action"
-                    english="ACTION"
-                    title="대응"
-                >
-                    <SimpleFlow
-                        items={[
-                            "Worker 실패",
-                            "Retry",
-                            "Retry 한도",
-                            "DLX",
-                            "DLQ",
-                        ]}
-                    />
-
-                    <BulletList
-                        items={[
-                            "Retry 가능한 실패와 최종 실패 분리",
-                            "Dead Letter Exchange / Queue 구성",
-                            "실패 메시지를 정상 Queue에서 격리",
-                        ]}
-                    />
-                </TroubleSection>
-
-                <TroubleSection
-                    type="result"
-                    english="RESULT"
-                    title="현재 상태"
-                >
-                    <PendingNotice>
-                        DLX / DLQ 인프라 구성은 완료했습니다.
-                        Retry 횟수와 DLQ 운영·재처리 기준은
-                        장애 주입 테스트 결과를 기반으로 최종화할 예정입니다.
-                    </PendingNotice>
+                    <LearningNote>
+                        Retry 횟수를 정하는 것보다
+                        무엇을 Retry해야 하는지 먼저 정의하는 것이 중요했습니다.
+                        실패의 성격을 분류하면서
+                        Retry와 DLQ를 실제 복구 정책으로 연결했습니다.
+                    </LearningNote>
                 </TroubleSection>
             </>
         ),
@@ -888,18 +1033,19 @@ const troubleshootingItems: readonly TroubleshootingItem[] = [
         number: "04",
 
         title:
-            "ACK 이전 Worker 장애에서 동일 Message 재전달",
+            "정합성을 위해 만든 Outbox가 계속 누적되는 운영 문제",
 
         summary:
-            "At-least-once 환경에서 같은 작업이 다시 실행돼도 데이터 정합성이 유지되는지 검증합니다.",
+            "CDC 원본 Event를 무기한 보관하지 않도록 보존 기간과 Batch Cleanup을 적용하고 삭제 작업 자체가 DB 부하가 되지 않도록 범위를 제한했습니다.",
 
         technologies: [
-            "ACK",
-            "Redelivery",
-            "Idempotency",
+            "Outbox",
+            "Retention",
+            "Batch Delete",
+            "Scheduler",
         ],
 
-        status: "partial",
+        status: "implemented",
 
         content: (
             <>
@@ -909,50 +1055,91 @@ const troubleshootingItems: readonly TroubleshootingItem[] = [
                     title="문제"
                 >
                     <Paragraph>
-                        Worker가 DB 처리를 완료한 직후
-                        ACK를 보내기 전에 종료되면
-                        RabbitMQ는 Message를 다시 전달할 수 있습니다.
+                        Transactional Outbox를 적용하면
+                        일정 생성 요청마다 outbox_events Row가 추가됩니다.
                     </Paragraph>
 
                     <SimpleFlow
                         items={[
-                            "Message",
-                            "Worker",
-                            "DB Commit",
-                            "Worker 종료",
-                            "ACK 실패",
-                            "Redelivery",
+                            "Generation",
+                            "Outbox 생성",
+                            "Debezium 전달",
+                            "처리 완료",
+                            "Row 유지",
+                            "계속 누적",
                         ]}
                         danger
                     />
+
+                    <Paragraph>
+                        메시지 전달 신뢰성을 위해 도입한 테이블이
+                        운영 기간이 길어질수록 계속 증가하면
+                        조회와 삭제 자체가 새로운 운영 비용이 됩니다.
+                    </Paragraph>
                 </TroubleSection>
 
                 <TroubleSection
                     type="action"
                     english="ACTION"
-                    title="대응"
+                    title="해결"
                 >
                     <BulletList
                         items={[
-                            "Generation 상태 기반 처리 판단",
-                            "State Guard 적용",
-                            "DB Constraint로 중복 저장 방어",
-                            "At-least-once 환경을 전제로 Consumer 설계",
+                            "Outbox 기본 보존 기간 7일",
+                            "기본 Cleanup 주기 1시간",
+                            "한 번에 최대 1,000건만 삭제",
+                            "created_at · id 순으로 오래된 Event부터 bounded batch delete",
+                            "Scheduler 실패 시 다음 주기에 다시 실행",
+                            "Retention Enabled · 기간 · 주기 · Batch Size를 설정으로 분리",
                         ]}
                     />
+
+                    <CodePanel>
+                        {`DELETE
+                          FROM outbox_events
+                          WHERE id IN (SELECT id
+                                       FROM outbox_events
+                                       WHERE created_at < :cutoff
+                                       ORDER BY created_at, id
+                              LIMIT :batchSize
+                              )`}
+                    </CodePanel>
                 </TroubleSection>
 
                 <TroubleSection
                     type="result"
                     english="RESULT"
-                    title="검증 예정"
+                    title="결과"
                 >
-                    <PendingNotice>
-                        실제 ACK 이전 Worker 강제 종료 실험 후
-                        Redelivery 횟수,
-                        중복 Candidate 수,
-                        최종 READY 전환 여부를 기록합니다.
-                    </PendingNotice>
+                    <div className="flex flex-wrap gap-2">
+                        <ResultMetric>
+                            Retention
+                            <strong className="ml-1">
+                                기본 7일
+                            </strong>
+                        </ResultMetric>
+
+                        <ResultMetric>
+                            Cleanup
+                            <strong className="ml-1">
+                                1,000건 단위
+                            </strong>
+                        </ResultMetric>
+
+                        <ResultMetric>
+                            Scheduler
+                            <strong className="ml-1">
+                                실패 후 다음 주기 재시도
+                            </strong>
+                        </ResultMetric>
+                    </div>
+
+                    <LearningNote>
+                        패턴을 적용하는 것에서 끝내지 않고
+                        그 패턴이 장기간 운영될 때
+                        어떤 데이터를 언제까지 보존할지도
+                        설계의 일부라는 점을 다뤘습니다.
+                    </LearningNote>
                 </TroubleSection>
             </>
         ),
@@ -971,7 +1158,7 @@ const failureExperiments: readonly FailureExperiment[] = [
             "Debezium 중단 후 재시작",
 
         summary:
-            "CDC 중단 동안 생성된 Outbox Event가 재기동 후 누락 없이 전달되는지 확인합니다.",
+            "CDC가 중단된 동안 DB에 누적된 Outbox Event가 Connector 재기동 후 이어서 전달되는지 실제 환경에서 확인합니다.",
 
         technologies: [
             "Debezium",
@@ -983,8 +1170,9 @@ const failureExperiments: readonly FailureExperiment[] = [
             <BulletList
                 items={[
                     "정상 상태에서 Generation + Outbox 생성",
-                    "Outbox Commit 이후 Debezium Container 종료",
-                    "중단 상태에서 Generation 추가 생성",
+                    "Debezium Container 강제 종료",
+                    "Connector 중단 상태에서 Generation 추가 생성",
+                    "Outbox Row와 RabbitMQ Queue 상태 비교",
                     "Debezium 재기동",
                 ]}
             />
@@ -993,13 +1181,15 @@ const failureExperiments: readonly FailureExperiment[] = [
         problem: (
             <>
                 <Paragraph>
-                    Debezium이 중단된 동안
-                    RabbitMQ에는 Event가 전달되지 않습니다.
+                    CDC 중단 중에는
+                    Outbox Event가 DB에는 존재하지만
+                    RabbitMQ로 전달되지 않습니다.
                 </Paragraph>
 
                 <Paragraph>
-                    재기동 시 중단 기간의 Event가
-                    유실되지 않고 이어서 처리되는지 확인해야 합니다.
+                    재기동 이후 중단 구간의 Event가
+                    유실되지 않고 이어서 전달되는지
+                    실제 WAL · Offset 기준으로 확인해야 합니다.
                 </Paragraph>
             </>
         ),
@@ -1007,10 +1197,10 @@ const failureExperiments: readonly FailureExperiment[] = [
         action: (
             <BulletList
                 items={[
-                    "Outbox Event DB 영속화",
+                    "Business 데이터와 Outbox Event를 동일 Transaction으로 영속화",
                     "PostgreSQL WAL 기반 CDC",
-                    "Debezium Offset 기반 처리 위치 관리",
-                    "Application Transaction과 CDC 장애 분리",
+                    "Debezium Offset을 통한 처리 위치 복구",
+                    "Application Transaction과 CDC 실행 상태 분리",
                 ]}
             />
         ),
@@ -1018,11 +1208,11 @@ const failureExperiments: readonly FailureExperiment[] = [
         criteria: (
             <MetricList
                 items={[
-                    "중단 중 Outbox 수",
-                    "재기동 후 전달 수",
+                    "중단 중 생성된 Outbox Event 수",
+                    "재기동 후 RabbitMQ 전달 수",
                     "Event 유실 건수",
-                    "READY 전환 완료 수",
-                    "복구 시간",
+                    "READY 전환 완료 건수",
+                    "Connector 복구 시간",
                 ]}
             />
         ),
@@ -1032,14 +1222,15 @@ const failureExperiments: readonly FailureExperiment[] = [
         number: "02",
 
         title:
-            "ACK 이전 Worker 강제 종료",
+            "DB 반영 후 ACK 이전 Worker 강제 종료",
 
         summary:
-            "Redelivery가 발생해도 같은 Generation의 후보가 중복 저장되지 않는지 확인합니다.",
+            "ACK 이전 장애로 Message가 재전달되어도 동일 Generation의 최종 상태와 데이터가 일관되게 유지되는지 확인합니다.",
 
         technologies: [
             "ACK",
             "Redelivery",
+            "Claim",
             "Idempotency",
         ],
 
@@ -1047,28 +1238,31 @@ const failureExperiments: readonly FailureExperiment[] = [
             <BulletList
                 items={[
                     "Worker Message Consume",
-                    "후보 데이터 DB 반영",
-                    "ACK 전송 직전 Worker 종료",
-                    "Worker 재기동",
+                    "Generation Claim 획득",
+                    "후보 데이터 처리",
+                    "ACK 이전 Worker Process 강제 종료",
+                    "Worker 재기동 후 Redelivery 확인",
                 ]}
             />
         ),
 
         problem: (
             <Paragraph>
-                DB 반영은 완료됐지만
-                RabbitMQ가 ACK를 받지 못해
-                동일 Message를 다시 전달할 수 있습니다.
+                DB 처리와 ACK 사이에서 장애가 발생하면
+                RabbitMQ는 작업 성공 여부를 알 수 없어
+                같은 Message를 다시 전달할 수 있습니다.
             </Paragraph>
         ),
 
         action: (
             <BulletList
                 items={[
-                    "Generation State Guard",
-                    "generationId 기준 처리 상태 확인",
+                    "At-least-once 전달 모델 전제",
+                    "Generation Claim Version",
+                    "State Guard",
+                    "후보 Snapshot Replace",
                     "DB Constraint",
-                    "멱등 Consumer",
+                    "현재 Claim 소유권 기반 최종 Write",
                 ]}
             />
         ),
@@ -1077,10 +1271,10 @@ const failureExperiments: readonly FailureExperiment[] = [
             <MetricList
                 items={[
                     "Redelivery 횟수",
-                    "중복 Candidate 수",
-                    "READY 완료 수",
-                    "Retry 횟수",
-                    "복구 실패 수",
+                    "중복 Candidate 건수",
+                    "Generation READY 전환 횟수",
+                    "Worker processed result",
+                    "최종 복구 시간",
                 ]}
             />
         ),
@@ -1090,43 +1284,46 @@ const failureExperiments: readonly FailureExperiment[] = [
         number: "03",
 
         title:
-            "Debezium Offset 유실",
+            "Debezium Offset 유실과 과거 Event Replay",
 
         summary:
-            "이미 처리한 Outbox Event가 다시 전달되는 상황에서도 데이터 정합성이 유지되는지 확인합니다.",
+            "이미 처리한 Outbox Event가 다시 전달되어도 Downstream 결과가 한 번 처리한 것과 동일하게 유지되는지 확인합니다.",
 
         technologies: [
             "Offset",
             "Replay",
-            "Idempotency",
+            "At-least-once",
+            "Fencing",
         ],
 
         simulation: (
             <BulletList
                 items={[
-                    "Outbox Event 정상 처리",
+                    "Outbox Event 정상 처리 완료",
                     "Debezium Offset 상태 초기화",
                     "Connector 재기동",
-                    "과거 Event 재전달 확인",
+                    "과거 Event Replay 확인",
+                    "Worker와 Generation 상태 관찰",
                 ]}
             />
         ),
 
         problem: (
             <Paragraph>
-                Offset 정보가 유실되면
-                이미 처리한 Event를 다시 읽을 수 있으므로
-                Downstream Consumer가 재실행에 안전해야 합니다.
+                Offset 정보가 사라지면
+                이미 처리한 Event가 다시 전달될 수 있습니다.
+                따라서 Downstream이 정확히 한 번 전달을
+                전제로 구현되어 있으면 데이터 중복이나 상태 충돌이 발생할 수 있습니다.
             </Paragraph>
         ),
 
         action: (
             <BulletList
                 items={[
-                    "Exactly Once를 전제로 하지 않음",
-                    "Generation 상태 확인",
-                    "DB Constraint 최종 방어",
-                    "동일 작업 재실행 허용",
+                    "Exactly-once 전달을 전제로 하지 않음",
+                    "Generation 상태와 Claim 기반 실행 판단",
+                    "최종 Write 전 Claim Version 재검증",
+                    "DB Constraint를 최종 불변식으로 사용",
                 ]}
             />
         ),
@@ -1134,10 +1331,11 @@ const failureExperiments: readonly FailureExperiment[] = [
         criteria: (
             <MetricList
                 items={[
-                    "재전달 Event 수",
-                    "중복 Candidate 수",
-                    "중복 Itinerary 수",
-                    "상태 이상 건수",
+                    "Replay Event 수",
+                    "중복 Candidate 건수",
+                    "중복 Itinerary 건수",
+                    "비정상 상태 전이 건수",
+                    "Skipped Worker 수",
                 ]}
             />
         ),
@@ -1147,13 +1345,14 @@ const failureExperiments: readonly FailureExperiment[] = [
         number: "04",
 
         title:
-            "반복 실패 Message의 Retry → DLQ",
+            "Retryable / Non-Retryable 실패와 DLQ 전환",
 
         summary:
-            "복구 불가능한 Message가 무한 Retry되지 않고 DLQ로 격리되는지 확인합니다.",
+            "일시 장애는 제한적으로 재시도하고 복구 불가능한 오류는 불필요한 Retry 없이 DLQ로 격리되는지 확인합니다.",
 
         technologies: [
             "Retry",
+            "Failure Classifier",
             "DLX",
             "DLQ",
         ],
@@ -1161,28 +1360,31 @@ const failureExperiments: readonly FailureExperiment[] = [
         simulation: (
             <BulletList
                 items={[
-                    "Worker 로직에 강제 Exception 주입",
-                    "동일 Message 반복 실패",
-                    "설정 Retry 횟수 도달",
-                    "DLQ 전환 확인",
+                    "Google Places 5xx 또는 Timeout 강제 발생",
+                    "Retry Count 관찰",
+                    "잘못된 Worker 입력으로 Non-Retryable 오류 발생",
+                    "Retry 여부 비교",
+                    "최종 Reject 후 DLQ Routing 확인",
                 ]}
             />
         ),
 
         problem: (
             <Paragraph>
-                영구 실패 Message가 정상 Queue에서 반복 처리되면
-                정상 Message 처리와 Worker 자원을 함께 방해합니다.
+                실패의 종류를 구분하지 않으면
+                일시 장애와 영구 장애 모두 같은 횟수만큼 반복되어
+                Worker 자원과 정상 Message 처리 기회를 낭비할 수 있습니다.
             </Paragraph>
         ),
 
         action: (
             <BulletList
                 items={[
-                    "제한된 횟수의 Retry",
-                    "DLX Routing",
-                    "DLQ 격리",
-                    "운영자가 실패 Message 별도 확인",
+                    "WorkerFailureClassifier 적용",
+                    "Provider 일시 장애와 Transient DB 오류만 Retry",
+                    "도메인·입력 오류는 Non-Retryable 처리",
+                    "최종 실패 Exception을 Listener 밖으로 전달",
+                    "RabbitMQ Reject → DLX → DLQ",
                 ]}
             />
         ),
@@ -1190,10 +1392,11 @@ const failureExperiments: readonly FailureExperiment[] = [
         criteria: (
             <MetricList
                 items={[
-                    "Retry 횟수",
+                    "Retryable 실패의 Retry 횟수",
+                    "Non-Retryable 실패의 Retry 횟수",
                     "DLQ Message 수",
-                    "무한 Retry 여부",
-                    "정상 Queue 영향",
+                    "정상 Queue 처리 영향",
+                    "Worker Failed Metric",
                 ]}
             />
         ),
@@ -1203,43 +1406,48 @@ const failureExperiments: readonly FailureExperiment[] = [
         number: "05",
 
         title:
-            "Worker 장기 중단과 Stale Generation",
+            "Worker 장기 정지와 Stale Generation 자동 복구",
 
         summary:
-            "COLLECTING_CANDIDATES 상태에 오래 머문 작업을 운영 관점에서 탐지할 수 있는지 확인합니다.",
+            "Lease가 만료된 COLLECTING_CANDIDATES 작업이 자동으로 다시 Queue에 들어가고 오래된 Worker 결과는 무시되는지 확인합니다.",
 
         technologies: [
+            "Lease",
             "Stale",
-            "Metric",
-            "Recovery",
+            "Recovery Scheduler",
+            "Fencing",
         ],
 
         simulation: (
             <BulletList
                 items={[
-                    "RabbitMQ Message 유입",
-                    "Worker 장시간 종료",
-                    "Generation 중간 상태 유지",
-                    "Worker 재기동",
+                    "Worker가 Generation Claim 획득",
+                    "COLLECTING_CANDIDATES 상태에서 Worker 장기 중단",
+                    "Processing Lease 만료",
+                    "Recovery Scheduler 동작 확인",
+                    "새 Worker 처리 후 기존 Worker 늦게 재개",
                 ]}
             />
         ),
 
         problem: (
             <Paragraph>
-                비동기 작업이 중간 상태에서 멈추면
-                사용자는 정상 처리 중인지
-                장애로 정지했는지 판단하기 어렵습니다.
+                Worker가 사라지면 Generation이
+                COLLECTING_CANDIDATES 상태에 영구 고착될 수 있고,
+                이전 Worker가 뒤늦게 살아날 경우
+                복구 Worker와 결과 경쟁이 발생할 수 있습니다.
             </Paragraph>
         ),
 
         action: (
             <BulletList
                 items={[
-                    "Generation 상태별 시작 시각 기록",
-                    "Stale Generation Metric",
-                    "운영 임계시간 설정",
-                    "재처리 또는 FAILED 정책 검토",
+                    "Processing Lease 기본 15분",
+                    "Stale Recovery Scan 기본 1분",
+                    "한 Scan에서 최대 50건 조회",
+                    "Expired Generation을 RabbitMQ로 재발행",
+                    "새 Claim Version 발급",
+                    "이전 Claim의 늦은 Write는 Fencing으로 차단",
                 ]}
             />
         ),
@@ -1248,9 +1456,10 @@ const failureExperiments: readonly FailureExperiment[] = [
             <MetricList
                 items={[
                     "Stale 탐지 시간",
-                    "Queue Depth",
-                    "재기동 후 완료 수",
-                    "복구 시간",
+                    "Recovery Message 발행 수",
+                    "새 Worker 완료 수",
+                    "Stale Worker Write 차단 수",
+                    "최종 READY 복구 시간",
                 ]}
             />
         ),
@@ -1300,7 +1509,6 @@ function ProjectHero() {
     return (
         <section>
             <div className="text-center">
-                {/* Project Badge */}
                 <span
                     className="
                         inline-flex h-10
@@ -1321,7 +1529,6 @@ function ProjectHero() {
                     Project
                 </span>
 
-                {/* Project Title */}
                 <h1
                     className="
                         mt-7
@@ -1334,7 +1541,6 @@ function ProjectHero() {
                     PlanMate
                 </h1>
 
-                {/* Technical Focus */}
                 <div className="mx-auto mt-7 max-w-[900px]">
                     <p
                         className="
@@ -1360,14 +1566,11 @@ function ProjectHero() {
                             sm:gap-3
                         "
                     >
-                        {/* Async */}
                         <span
                             className="
                                 text-base font-bold
                                 text-[#315FEA]
-
                                 sm:text-lg
-
                                 dark:text-blue-300
                             "
                         >
@@ -1376,14 +1579,11 @@ function ProjectHero() {
 
                         <FocusDivider/>
 
-                        {/* Reliability */}
                         <span
                             className="
                                 text-base font-bold
                                 text-[#315FEA]
-
                                 sm:text-lg
-
                                 dark:text-blue-300
                             "
                         >
@@ -1392,39 +1592,38 @@ function ProjectHero() {
 
                         <FocusDivider/>
 
-                        {/* Failure */}
                         <span
                             className="
                                 text-base font-bold
                                 text-[#315FEA]
-
                                 sm:text-lg
-
                                 dark:text-blue-300
                             "
                         >
-                            장애 복구 검증
+                            장애 복구 설계 · 검증
                         </span>
                     </div>
 
-                    {/* Technical Summary */}
                     <p
                         className="
                             mx-auto mt-4
-                            max-w-[800px]
+                            max-w-[830px]
                             break-keep
                             text-sm leading-7
                             text-muted-foreground
                         "
                     >
-                        HTTP–Worker 분리부터 Outbox·CDC,
-                        At-least-once와 멱등성,
-                        장애 주입을 통한 복구 검증까지
-                        메시징 기반 비동기 처리의 실패 지점을 다뤘습니다.
+                        HTTP–Worker 책임 분리부터
+                        Outbox·CDC,
+                        At-least-once,
+                        Claim·Fencing,
+                        실패 분류와 DLQ까지
+                        비동기 작업의 실패와 재실행 경계를 구현했습니다.
+                        복구 로직은 자동 테스트로 검증하고,
+                        실제 프로세스·컨테이너 장애 주입은 별도 Reliability Test로 확인합니다.
                     </p>
                 </div>
 
-                {/* Service Description */}
                 <p
                     className="
                         mx-auto mt-7
@@ -1437,13 +1636,14 @@ function ProjectHero() {
                         sm:text-base
                     "
                 >
-                    실제 장소 후보를 기반으로 검증 가능한 AI 여행 일정을
-                    생성하는 서비스입니다. 사용자 조건에 따라 장소 후보를
-                    수집하고 AI 생성 결과를 서버에서 검증해 일정으로 저장합니다.
+                    실제 장소 후보를 기반으로
+                    검증 가능한 AI 여행 일정을 생성하는 서비스입니다.
+                    사용자 조건에 따라 장소 후보를 수집하고,
+                    AI가 만든 결과를 서버의 도메인 규칙과
+                    실제 이동 가능성을 기준으로 다시 검증한 뒤 저장합니다.
                 </p>
             </div>
 
-            {/* Project Preview + Summary */}
             <div
                 className="
                     mt-12 grid gap-6
@@ -1462,7 +1662,6 @@ function ProjectHero() {
 function FocusDivider() {
     return (
         <>
-            {/* Desktop */}
             <span
                 className="
                     hidden
@@ -1475,7 +1674,6 @@ function FocusDivider() {
                 /
             </span>
 
-            {/* Mobile */}
             <span
                 className="
                     block
@@ -1658,19 +1856,19 @@ function ProjectSummary() {
                     <HeroCoreItem
                         number="02"
                         title="DB ↔ Message 정합성"
-                        result="→ Outbox + Debezium CDC"
+                        result="→ Transactional Outbox · Debezium CDC"
                     />
 
                     <HeroCoreItem
                         number="03"
-                        title="재전달 가능한 Worker"
-                        result="→ ACK · 멱등성 · Retry · DLQ"
+                        title="재실행 가능한 Worker"
+                        result="→ At-least-once · Claim/Fencing · Retry/DLQ"
                     />
 
                     <HeroCoreItem
                         number="04"
                         title="AI 일정 의미 검증"
-                        result="→ Candidate · 시간 중복 · 활동시간 검증"
+                        result="→ Candidate · Time · Constraint · Routes"
                     />
                 </div>
             </div>
@@ -1844,7 +2042,7 @@ function CoreSection() {
             <SectionHeader
                 eyebrow="FEATURED PROJECTS"
                 title="프로젝트 핵심 사항"
-                description="프로젝트 안에서 어떤 문제가 있었고 이를 어떤 방식으로 해결했는지 중요한 사례만 정리했습니다."
+                description="비동기 처리 자체보다 작업이 실패하거나 다시 실행되는 상황까지 고려해 설계한 핵심 사례를 정리했습니다."
             />
 
             <AccordionGuide/>
@@ -1974,7 +2172,7 @@ function TroubleshootingSection() {
             <SectionHeader
                 eyebrow="TROUBLE SHOOTING"
                 title="트러블슈팅"
-                description="개발 과정에서 실제로 해결했거나 비동기 구조로 전환하면서 새롭게 다뤄야 했던 실패 조건을 정리했습니다."
+                description="기능 구현 자체보다 비동기·외부 I/O·동시 실행·운영 과정에서 발생할 수 있는 실패 경계를 중심으로 정리했습니다."
             />
 
             <AccordionGuide/>
@@ -2073,13 +2271,51 @@ function FailureInjectionSection() {
             <SectionHeader
                 eyebrow="RELIABILITY TEST"
                 title="장애 주입 테스트"
-                description="각 구성요소를 의도적으로 중단해 예상한 복구 경로가 실제로 동작하는지 검증합니다."
-                badge="검증 예정"
+                description="복구 로직과 자동 테스트는 구현했습니다. 다음 단계에서는 실제 프로세스와 컨테이너를 중단해 설계한 복구 경로가 운영 환경에서도 동일하게 동작하는지 검증합니다."
+                badge="실제 장애 주입 예정"
             />
 
             <div
                 className="
                     mt-7
+                    rounded-[20px]
+                    border border-[#B9DCC9]
+                    bg-[#F7FDF9]
+                    p-5
+                    dark:border-[#3C5C49]
+                    dark:bg-[#19251E]
+                "
+            >
+                <div className="flex gap-3">
+                    <Activity
+                        className="
+                            mt-1 size-5 shrink-0
+                            text-[#159A69]
+                        "
+                    />
+
+                    <p
+                        className="
+                            break-keep
+                            text-sm leading-7
+                            text-muted-foreground
+                        "
+                    >
+                        <Strong>
+                            복구 구조 · 자동 테스트 구현 완료.
+                        </Strong>{" "}
+                        아래 PENDING은 기능 미구현을 의미하지 않습니다.
+                        실제 Docker Container 중단,
+                        Worker Process Kill,
+                        Offset 초기화 등
+                        운영 장애 주입 결과가 아직 기록되지 않았다는 의미입니다.
+                    </p>
+                </div>
+            </div>
+
+            <div
+                className="
+                    mt-4
                     rounded-[20px]
                     border border-[#E4D39E]
                     bg-[#FFFCF4]
@@ -2103,11 +2339,11 @@ function FailureInjectionSection() {
                             text-muted-foreground
                         "
                     >
-                        각 실험은
+                        실험은
                         <Strong>
                             {" "}장애 시뮬레이션 → 예상 문제 →
-                            대안·해결방안 → 판정 기준 →
-                            실제 결과 → 결론
+                            구현된 복구 방안 → 판정 기준 →
+                            실제 결과 → 설계 수정
                         </Strong>
                         순서로 기록합니다.
                     </p>
@@ -2208,7 +2444,7 @@ function FailureAccordionItem({
                     <FailureSection
                         type="action"
                         english="ACTION"
-                        title="대안 · 해결 방안"
+                        title="구현된 복구 방안"
                     >
                         {experiment.action}
                     </FailureSection>
@@ -2228,12 +2464,12 @@ function FailureAccordionItem({
                         >
                             <PendingResult
                                 title="실제 결과"
-                                description="장애 주입 후 Metric, 로그, DB 상태를 작성합니다."
+                                description="장애 주입 후 Metric · 로그 · RabbitMQ · DB 상태를 기록합니다."
                             />
 
                             <PendingResult
                                 title="결론"
-                                description="예상과 실제 차이 및 설계 수정 내용을 작성합니다."
+                                description="예상과 실제의 차이, 복구 시간과 추가 설계 변경 사항을 기록합니다."
                             />
                         </div>
                     </FailureSection>
@@ -2254,7 +2490,7 @@ function AdditionalDesignSection() {
             <SectionHeader
                 eyebrow="ADDITIONAL DESIGN"
                 title="추가 설계"
-                description="일정 생성 파이프라인 이외의 구현은 핵심 내용만 간결하게 정리했습니다."
+                description="일정 생성의 신뢰성 흐름 이외의 설계는 핵심 역할만 간결하게 정리했습니다."
             />
 
             <div
@@ -2266,20 +2502,22 @@ function AdditionalDesignSection() {
                 <AdditionalCard
                     icon={<Database className="size-5"/>}
                     title="Input / Candidate Snapshot"
-                    description="Generation 생성 당시의 입력과 Worker가 실제 사용한 후보를 보존해 이후 데이터 변경과 과거 실행을 분리했습니다."
+                    description="Generation 생성 당시의 여행 조건과 Worker가 실제로 확정한 Candidate 집합을 저장해 외부 데이터가 변경되더라도 과거 실행의 판단 근거를 보존했습니다."
                     tags={[
                         "InputSnapshot",
                         "CandidateSnapshot",
+                        "Reproducibility",
                     ]}
                 />
 
                 <AdditionalCard
                     icon={<Radio className="size-5"/>}
                     title="실시간 상태 전달"
-                    description="상태 변경은 DB Commit 이후 WebSocket으로 전달하고 Push 실패 시 REST로 DB 상태를 다시 조회합니다."
+                    description="Generation 상태 변경은 DB Commit 이후 WebSocket으로 전달하고 Push를 놓친 경우 REST 재조회로 DB 상태를 복구하도록 구성했습니다."
                     tags={[
                         "WebSocket",
                         "STOMP",
+                        "AFTER_COMMIT",
                         "REST Recovery",
                     ]}
                 />
@@ -2287,20 +2525,23 @@ function AdditionalDesignSection() {
                 <AdditionalCard
                     icon={<Activity className="size-5"/>}
                     title="Observability"
-                    description="Worker 처리량, Retry, 처리시간, Generation 상태를 Metric으로 노출해 비동기 내부 상태를 관찰합니다."
+                    description="Worker 처리 결과·Retry·Stale Generation뿐 아니라 Candidate 수, AI Validation 성공/차단, Issue Severity와 Code를 Metric으로 노출하고 Grafana에서 일정 생성 파이프라인을 관찰하도록 구성했습니다."
                     tags={[
                         "Prometheus",
                         "Grafana",
+                        "Candidate Metric",
+                        "Validation Metric",
                     ]}
                 />
 
                 <AdditionalCard
                     icon={<KeyRound className="size-5"/>}
                     title="Authentication"
-                    description="Local/OAuth2 인증을 하나의 사용자 모델로 연결하고 JWT와 Redis 기반 Refresh Session을 사용했습니다."
+                    description="Local/OAuth2 인증을 하나의 사용자 모델로 연결하고 JWT Access Token과 Redis 기반 Refresh Session을 사용했습니다."
                     tags={[
                         "Spring Security",
                         "JWT",
+                        "OAuth2",
                         "Redis",
                     ]}
                 />
@@ -2334,51 +2575,77 @@ function RetrospectiveSection() {
             >
                 <p
                     className="
-                        max-w-[860px]
+                        max-w-[900px]
                         break-keep
                         text-sm leading-8
                         text-muted-foreground
                         sm:text-base
                     "
                 >
-                    현재 PlanMate의 규모만 보면
-                    RabbitMQ와 Debezium이 반드시 필요한 것은 아닙니다.
-                    단순히 오래 걸리는 작업을 HTTP 요청에서 분리하는 것이
-                    목적이라면 @Async나 DB Polling Worker도
-                    충분히 고려할 수 있습니다.
+                    현재 PlanMate의 트래픽과 규모만 보면
+                    RabbitMQ와 Debezium이 반드시 필요한 구조는 아닙니다.
+                    단순히 오래 걸리는 작업을 HTTP 요청 밖으로 옮기는 것이
+                    목적이었다면 @Async나 DB Polling Worker도
+                    더 단순한 대안이 될 수 있습니다.
                 </p>
 
                 <p
                     className="
                         mt-5
-                        max-w-[860px]
+                        max-w-[900px]
                         break-keep
                         text-sm leading-8
                         text-muted-foreground
                         sm:text-base
                     "
                 >
-                    이 프로젝트에서는
+                    이 프로젝트에서는 단순 비동기 구현보다
                     <Strong>
-                        {" "}ACK, Redelivery, Retry, DLQ,
-                        Transactional Outbox, CDC,
-                        Consumer 멱등성과 장애 복구
+                        {" "}DB와 Message Broker 사이의 정합성,
+                        At-least-once 전달,
+                        ACK와 Redelivery,
+                        Consumer 멱등성,
+                        Stale Worker,
+                        Fencing,
+                        Retry와 DLQ,
+                        Outbox Retention
                     </Strong>
-                    를 직접 설계하고
-                    장애를 주입해 확인하는 것까지
-                    학습 범위에 포함했습니다.
+                    까지 직접 구현하면서
+                    비동기 작업이 실패하고 다시 실행될 때의
+                    상태 변화를 학습 범위로 잡았습니다.
+                </p>
+
+                <p
+                    className="
+                        mt-5
+                        max-w-[900px]
+                        break-keep
+                        text-sm leading-8
+                        text-muted-foreground
+                        sm:text-base
+                    "
+                >
+                    현재 복구 정책과 자동 테스트 구현까지 완료했고,
+                    다음 단계에서는
+                    Worker Kill,
+                    Debezium 중단,
+                    Offset Replay 같은 실제 장애를 주입해
+                    구현된 복구 경로와 Metric이 예상대로 동작하는지
+                    확인합니다.
                 </p>
 
                 <div className="mt-7 flex flex-wrap gap-2">
                     {[
-                        "ACK",
-                        "Redelivery",
-                        "Retry",
-                        "DLQ",
                         "Outbox",
                         "CDC",
-                        "Idempotency",
-                        "Failure Recovery",
+                        "At-least-once",
+                        "Claim",
+                        "Lease",
+                        "Fencing",
+                        "Retry",
+                        "DLQ",
+                        "Retention",
+                        "Observability",
                     ].map((item) => (
                         <TechnologyPill key={item}>
                             {item}
@@ -2472,7 +2739,7 @@ function AccordionHeader({
                         xl:justify-between
                     "
                 >
-                    <div className="min-w-0 max-w-[640px]">
+                    <div className="min-w-0 max-w-[680px]">
                         <div
                             className="
                                 flex flex-wrap
@@ -2595,7 +2862,7 @@ function SectionHeader({
 }) {
     return (
         <div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
                 <span
                     className="
                         inline-flex
@@ -2645,7 +2912,7 @@ function SectionHeader({
                 <p
                     className="
                         mt-4
-                        max-w-[820px]
+                        max-w-[850px]
                         break-keep
                         text-sm leading-7
                         text-muted-foreground
@@ -2980,7 +3247,7 @@ function DualWriteDiagram() {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Compact Schedule Example                                                   */
+/* Schedule Example                                                           */
 
 /* -------------------------------------------------------------------------- */
 
@@ -3069,7 +3336,7 @@ function CodePanel({
         <pre
             className="
                 mt-5
-                max-w-[560px]
+                max-w-[620px]
                 overflow-x-auto
                 rounded-xl
                 bg-[#151515]
@@ -3117,7 +3384,7 @@ function LearningNote({
         <div
             className="
                 mt-5
-                flex max-w-[850px]
+                flex max-w-[880px]
                 gap-3
                 text-sm leading-7
                 text-muted-foreground
@@ -3137,41 +3404,6 @@ function LearningNote({
     );
 }
 
-function PendingNotice({
-                           children,
-                       }: {
-    children: ReactNode;
-}) {
-    return (
-        <div
-            className="
-                max-w-[850px]
-                rounded-xl
-                border border-dashed
-                border-[#D7C58D]
-                bg-[#FFFDF7]
-                p-4
-                text-sm leading-7
-                text-muted-foreground
-                dark:border-[#5F5636]
-                dark:bg-black/10
-            "
-        >
-            <div className="flex gap-3">
-                <TriangleAlert
-                    className="
-                        mt-1
-                        size-4 shrink-0
-                        text-[#9B7C29]
-                    "
-                />
-
-                <div>{children}</div>
-            </div>
-        </div>
-    );
-}
-
 function MetricList({
                         items,
                     }: {
@@ -3180,7 +3412,7 @@ function MetricList({
     return (
         <div
             className="
-                grid max-w-[760px]
+                grid max-w-[800px]
                 gap-2
                 sm:grid-cols-2
             "
@@ -3210,7 +3442,7 @@ function MetricList({
                             dark:text-[#83B497]
                         "
                     >
-                        측정 예정
+                        실험 측정
                     </span>
                 </div>
             ))}
@@ -3316,17 +3548,13 @@ function StatusBadge({
         implemented:
             "border-[#BDD9C7] bg-[#EEF7F1] text-[#41765A] dark:border-[#3C5C49] dark:bg-[#19251E] dark:text-[#83B497]",
 
-        partial:
-            "border-[#C8D6F0] bg-[#F1F4FA] text-[#496AA8] dark:border-[#3E4C69] dark:bg-[#1B2230] dark:text-[#91A9D7]",
-
         planned:
             "border-[#E1D19F] bg-[#FAF6EA] text-[#9B7C29] dark:border-[#5F5636] dark:bg-[#292419] dark:text-[#D9BC72]",
     };
 
     const labels = {
         implemented: "구현 완료",
-        partial: "검증 진행",
-        planned: "검증 예정",
+        planned: "실험 예정",
     };
 
     return (
